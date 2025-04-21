@@ -12,7 +12,8 @@
     "subtasks": "ts-node examples/subtasks.ts",
     "parallel": "ts-node examples/parallel.ts",
     "tools": "ts-node examples/tools-demo.ts",
-    "tools:local": "ts-node examples/tools-demo-local.ts"
+    "tools:local": "ts-node examples/tools-demo-local.ts",
+    "tools:advanced": "ts-node examples/tools-demo-advanced.ts"
   },
   "dependencies": {
     "abort-controller": "^3.0.0",

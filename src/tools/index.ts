@@ -5,11 +5,17 @@ import { Tool, ToolResult } from '../types';
 import { createHttpTools } from './http-tools';
 import { createDataTools } from './data-tools';
 import { createUtilityTools } from './utility-tools';
+import { createFileTools } from './file-tools';
+import { createAiTools } from './ai-tools';
+import { createSystemTools } from './system-tools';
 
 // Export all tool-related utilities
 export * from './http-tools';
 export * from './data-tools';
 export * from './utility-tools';
+export * from './file-tools';
+export * from './ai-tools';
+export * from './system-tools';
 
 /**
  * Creates a standard library of useful tools
@@ -19,7 +25,10 @@ export function createStandardTools(): Tool[] {
   return [
     ...createHttpTools(),
     ...createDataTools(),
-    ...createUtilityTools()
+    ...createUtilityTools(),
+    ...createFileTools(),
+    ...createAiTools(),
+    ...createSystemTools()
   ];
 }
 

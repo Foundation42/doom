@@ -23,19 +23,49 @@ export {
   createHttpTools,
   createDataTools,
   createUtilityTools,
+  createFileTools,
+  createAiTools,
+  createSystemTools,
+  
   // Specific tools (for direct usage)
+  // HTTP Tools
   fetchUrlTool,
   searchWebTool,
   extractDataTool,
+  
+  // Data Tools
   jsonParserTool,
   csvTool,
   filterDataTool,
   chartGeneratorTool,
+  
+  // Utility Tools
   calculatorTool,
   dateTimeTool,
   translationTool,
   stringUtilsTool,
-  hashingTool
+  hashingTool,
+  
+  // File Tools
+  readFileTool,
+  writeFileTool,
+  listFilesTool,
+  fileInfoTool,
+  searchFilesTool,
+  
+  // AI Tools
+  textSummarizerTool,
+  sentimentAnalyzerTool,
+  keywordExtractorTool,
+  textClassifierTool,
+  aiTranslationTool,
+  
+  // System Tools
+  systemInfoTool,
+  processInfoTool,
+  environmentTool,
+  networkInfoTool,
+  commandTool
 } from './tools';
 
 // Example default logger
