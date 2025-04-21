@@ -41,6 +41,9 @@ npm run subtasks
 
 # Run the parallel execution benchmark
 npm run parallel
+
+# Explore the standard tools library
+npm run tools
 ```
 
 ### API Key Configuration
@@ -188,6 +191,73 @@ const options = {
 
 const result = await runChatWithTools(messages, tools, options);
 ```
+
+## Standard Tools Library
+
+ChatRunner includes a standard library of reusable tools that you can include in your projects:
+
+```typescript
+import { createStandardTools } from 'chatrunner';
+
+// Get the entire standard tool library
+const allTools = createStandardTools();
+
+// Or import specific tool categories
+import { 
+  createHttpTools, 
+  createDataTools, 
+  createUtilityTools 
+} from 'chatrunner/tools';
+
+const httpTools = createHttpTools();
+const dataTools = createDataTools();
+const utilityTools = createUtilityTools();
+
+// Run with the tools
+const result = await runChatWithTools(messages, allTools);
+```
+
+### Available Tool Categories
+
+1. **HTTP Tools**
+   - `fetchUrl`: Fetches content from a URL with support for various HTTP methods
+   - `searchWeb`: Simulates web search and returns relevant results
+   - `extractData`: Extracts structured data from HTML or text content
+
+2. **Data Tools**
+   - `parseJson`: Validates and formats JSON data
+   - `processCSV`: Handles CSV parsing, transformation, and conversion
+   - `filterData`: Filters, sorts, and aggregates data
+   - `generateChart`: Creates data visualizations (simulated)
+
+3. **Utility Tools**
+   - `calculator`: Performs mathematical calculations and unit conversions
+   - `dateTime`: Handles date formatting, calculations, and manipulations
+   - `translate`: Simulates language translation
+   - `stringUtils`: Provides string manipulation operations
+   - `cryptoHash`: Performs hashing, encoding, and generation operations
+
+### Helper Utilities
+
+The tools library also includes useful helper functions:
+
+```typescript
+import { safeToolExecution, delay } from 'chatrunner';
+
+// Safely execute a function with error handling
+const result = await safeToolExecution(
+  async () => {
+    // Your tool logic here
+    return { output: "Success!" };
+  },
+  (error) => `Custom error message: ${error.message}`
+);
+
+// Create a delay with abort signal support
+await delay(1000, abortSignal);
+```
+
+Try the `npm run tools` command to explore the standard library in an interactive demo.
 
 ## License
 

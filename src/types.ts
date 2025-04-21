@@ -58,6 +58,10 @@ export interface ToolResult {
   output: string;
   /** Optional sub-tasks to execute sequentially. */
   subTasks?: SubTask[];
+  /** Optional error message if the tool execution failed. */
+  error?: string;
+  /** Optional data payload returned by the tool. */
+  [key: string]: any;
 }
 
 /**
