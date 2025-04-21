@@ -6,7 +6,6 @@ import { createConsoleLogger } from '../src/index';
 import { createStandardTools } from '../src/tools';
 import { Tool, Message } from '../src/types';
 import * as dotenv from 'dotenv';
-import * as readlineSync from 'readline-sync';
 
 // Load environment variables
 dotenv.config();
@@ -14,11 +13,11 @@ dotenv.config();
 // Create a logger
 const logger = createConsoleLogger('Tools Demo: ', 'info');
 
-// Get OpenAI API key from environment or prompt
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || readlineSync.question('Enter your OpenAI API key: ', { hideEchoBack: true });
+// Get OpenAI API key from environment
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 if (!OPENAI_API_KEY) {
-  logger.error('API key is required to run this demo.');
+  logger.error('API key is required to run this demo. Set the OPENAI_API_KEY environment variable.');
   process.exit(1);
 }
 
@@ -73,42 +72,64 @@ async function runToolsDemo() {
   
   console.log('\nAssistant:', response);
   
-  // Simple REPL for interactive demo
-  while (true) {
-    // Get user input
-    const input = readlineSync.question('\nYou: ');
-    
-    // Check for exit command
-    if (input.toLowerCase() === 'exit' || input.toLowerCase() === 'quit') {
-      logger.info('Exiting demo...');
-      break;
-    }
-    
-    // Add user message to history
-    initialHistory.push({ role: 'assistant', content: response });
-    initialHistory.push({ role: 'user', content: input } as Message);
-    
-    // Call the API again
-    const nextResponse = await runChatWithTools(
-      initialHistory,
-      tools,
-      {
-        signal: AbortSignal.timeout(120000),
-        modelName: 'gpt-4o-mini',
-        temperature: 0.7,
-        logger,
-        maxRetries: 2,
-        timeoutMs: 30000,
-        parallel: {
-          enabled: true,
-          maxConcurrent: 3,
-          continueOnError: true
-        }
+  // In a non-interactive environment, let's demonstrate a few example tool calls
+  
+  logger.info("Demonstrating calculator tool with a specific query...");
+  
+  // Add follow-up question to use the calculator
+  initialHistory.push({ role: 'assistant', content: response });
+  initialHistory.push({ role: 'user', content: "Calculate 15% of 240 and convert 72°F to Celsius" } as Message);
+  
+  // Call the API again with the calculation request
+  const calculationResponse = await runChatWithTools(
+    initialHistory,
+    tools,
+    {
+      signal: AbortSignal.timeout(120000),
+      modelName: 'gpt-4o-mini',
+      temperature: 0.7,
+      logger,
+      maxRetries: 2,
+      timeoutMs: 30000,
+      parallel: {
+        enabled: true,
+        maxConcurrent: 3,
+        continueOnError: true
       }
-    );
-    
-    console.log('\nAssistant:', nextResponse);
-  }
+    }
+  );
+  
+  console.log('\nAssistant:', calculationResponse);
+  
+  // Demonstrate JSON parsing tool
+  logger.info("Demonstrating JSON parsing tool...");
+  
+  // Add follow-up question to parse JSON
+  initialHistory.push({ role: 'assistant', content: calculationResponse });
+  initialHistory.push({ role: 'user', content: 'Parse this JSON: {"name": "John", "age": 30, "skills": ["JavaScript", "TypeScript", "React"]}' } as Message);
+  
+  // Call the API again with the JSON parsing request
+  const jsonResponse = await runChatWithTools(
+    initialHistory,
+    tools,
+    {
+      signal: AbortSignal.timeout(120000),
+      modelName: 'gpt-4o-mini',
+      temperature: 0.7,
+      logger,
+      maxRetries: 2,
+      timeoutMs: 30000,
+      parallel: {
+        enabled: true,
+        maxConcurrent: 3,
+        continueOnError: true
+      }
+    }
+  );
+  
+  console.log('\nAssistant:', jsonResponse);
+  
+  logger.info("Demo completed successfully!");
 }
 
 // Print demo instructions
