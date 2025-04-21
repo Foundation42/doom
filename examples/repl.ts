@@ -1,5 +1,5 @@
 import * as readline from 'readline-sync';
-import { runChatWithTools } from '../src/chatrunner';
+import { runChatWithTools, createConsoleLogger } from '../src';
 import { Message, Tool } from '../src/types';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -59,34 +59,39 @@ const tools: Tool[] = [
       additionalProperties: false
     },
     func: async (args: { city: string, country: string }) => {
-      switch (args.city.toLowerCase()) {
-        case 'new york':
-          return `It's currently 75°F and sunny in ${args.city}.`;
-        case 'los angeles':
-          return `It's currently 80°F and sunny in ${args.city}.`;
-        case 'chicago':
-          return `It's currently 65°F and cloudy in ${args.city}.`;
-        case 'london':
-          return `It's currently 60°F and rainy in ${args.city}.`;
-        case 'tokyo':
-          return `It's currently 70°F and partly cloudy in ${args.city}.`;
-        case 'paris':
-          return `It's currently 68°F and overcast in ${args.city}.`;
-        case 'sydney':
-          return `It's currently 78°F and sunny in ${args.city}.`;
-        case 'mumbai':
-          return `It's currently 85°F and humid in ${args.city}.`;
-        case 'cairo':
-          return `It's currently 90°F and sunny in ${args.city}.`;
-        case 'moscow':
-          return `It's currently 55°F and cloudy in ${args.city}.`;
-        default:
-          // Fallback for any other city
-          return `Sorry, I don't have weather information for ${args.city}.`;
-      }
+      const weather = (() => {
+        switch (args.city.toLowerCase()) {
+          case 'new york':
+            return `It's currently 75°F and sunny in ${args.city}.`;
+          case 'los angeles':
+            return `It's currently 80°F and sunny in ${args.city}.`;
+          case 'chicago':
+            return `It's currently 65°F and cloudy in ${args.city}.`;
+          case 'london':
+            return `It's currently 60°F and rainy in ${args.city}.`;
+          case 'tokyo':
+            return `It's currently 70°F and partly cloudy in ${args.city}.`;
+          case 'paris':
+            return `It's currently 68°F and overcast in ${args.city}.`;
+          case 'sydney':
+            return `It's currently 78°F and sunny in ${args.city}.`;
+          case 'mumbai':
+            return `It's currently 85°F and humid in ${args.city}.`;
+          case 'cairo':
+            return `It's currently 90°F and sunny in ${args.city}.`;
+          case 'moscow':
+            return `It's currently 55°F and cloudy in ${args.city}.`;
+          default:
+            // Fallback for any other city
+            return `Sorry, I don't have weather information for ${args.city}.`;
+        }
+      })();
+      
+      return {
+        output: weather
+      };
     }
   },
-  /*
   {
     name: 'calculateTip',
     description: 'Calculate tip amount for a bill',
@@ -108,13 +113,26 @@ const tools: Tool[] = [
     func: async (args: { amount: number, percentage: number }) => {
       const tipAmount = args.amount * (args.percentage / 100);
       const total = args.amount + tipAmount;
+      
       return {
-        output: `Tip: $${tipAmount.toFixed(2)}, Total: $${total.toFixed(2)}`
+        output: `Tip: $${tipAmount.toFixed(2)}, Total: $${total.toFixed(2)}`,
+        // Example of a subtask that could be triggered after calculation
+        subTasks: [
+          {
+            toolName: 'get_weather',
+            args: {
+              city: 'New York',
+              country: 'USA'
+            }
+          }
+        ]
       };
     }
   }
-    */
 ];
+
+// Create a custom logger for the REPL
+const replLogger = createConsoleLogger('\n', 'info');
 
 async function main() {
   console.log('🤖 ChatRunner REPL');
@@ -157,7 +175,10 @@ Keep responses brief and focused.`
       // Run chat with tools
       const response = await runChatWithTools(messages, tools, {
         signal: controller.signal,
-        temperature: 0.7
+        temperature: 0.7,
+        logger: replLogger,
+        timeoutMs: 25000,
+        maxRetries: 2
       });
 
       clearTimeout(timeoutId);

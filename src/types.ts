@@ -10,6 +10,24 @@ export interface Message {
 }
 
 /**
+ * Represents a pure chat message (no tool calls).
+ */
+export interface ChatMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+  name?: string;
+}
+
+/**
+ * Represents a tool message.
+ */
+export interface ToolMessage {
+  role: 'tool';
+  content: string;
+  tool_call_id: string;
+}
+
+/**
  * Represents a tool call in an assistant message
  */
 export interface ToolCall {
@@ -19,6 +37,7 @@ export interface ToolCall {
     name: string;
     arguments: string;
   };
+  parentCallId?: string; // Track nested call hierarchy
 }
 
 /**
@@ -52,7 +71,17 @@ export interface Tool {
   /** JSON Schema for the arguments. */
   parameters: Record<string, unknown>;
   /** Actual implementation to run. */
-  func: (args: any) => Promise<string | ToolResult>;
+  func: (args: any) => Promise<ToolResult>;
+}
+
+/**
+ * Logger interface for injecting custom logging
+ */
+export interface Logger {
+  debug: (message: string, ...args: any[]) => void;
+  info: (message: string, ...args: any[]) => void;
+  warn: (message: string, ...args: any[]) => void;
+  error: (message: string, ...args: any[]) => void;
 }
 
 /**
@@ -71,4 +100,6 @@ export interface RunOptions {
   signal?: AbortSignal;
   /** Maximum time (ms) to wait for the API response before abort. */
   timeoutMs?: number;
+  /** Custom logger implementation. */
+  logger?: Logger;
 }
