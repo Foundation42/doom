@@ -3,6 +3,7 @@ import { AbortController } from 'abort-controller';
 import { Message, Tool, RunOptions, SubTask, ToolResult, Logger, ParallelConfig } from './types';
 import { TextDecoder } from 'util';
 import { Readable } from 'stream';
+import { executeParallel } from './promise-pool';
 
 // Default console-based logger
 const defaultLogger: Logger = {
@@ -274,23 +275,27 @@ async function executeSubTasks(
   if (shouldRunParallel) {
     logger.info(`Executing ${subTasks.length} subtasks in parallel mode`);
     
-    // Determine batch size for concurrent tasks
+    // Determine concurrency limit for tasks
     const maxConcurrent = parallelConfig.maxConcurrent || 4;
+    const continueOnError = parallelConfig.continueOnError || false;
     
-    // Process tasks in batches
-    for (let i = 0; i < subTasks.length; i += maxConcurrent) {
-      const batch = subTasks.slice(i, i + maxConcurrent);
-      
-      // Execute each task in this batch concurrently
-      logger.debug(`Running parallel batch of ${batch.length} tasks`);
-      const promises = batch.map(task => executeOneSubTask(task, toolMap, messages, {
+    // Create an array of task functions
+    const taskFunctions = subTasks.map(task => () => 
+      executeOneSubTask(task, toolMap, messages, {
         ...options,
         executionDepth
-      }));
-      
-      // Wait for all tasks in this batch to complete
-      await Promise.all(promises);
-    }
+      })
+    );
+    
+    // Use our promise pool for controlled concurrency
+    logger.debug(`Running with concurrency limit of ${maxConcurrent}, continueOnError=${continueOnError}`);
+    
+    // Execute tasks with the pool
+    await executeParallel(taskFunctions, {
+      concurrency: maxConcurrent,
+      continueOnError: continueOnError, 
+      signal: options.signal
+    });
   } else {
     // Sequential execution
     logger.debug(`Executing ${subTasks.length} subtasks sequentially`);

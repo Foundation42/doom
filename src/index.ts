@@ -1,5 +1,6 @@
 // Main exports from the package
 export { runChatWithTools } from './chatrunner';
+export { promisePool, promisePoolAllSettled, executeParallel } from './promise-pool';
 export type {
   Message,
   ChatMessage,
@@ -9,7 +10,8 @@ export type {
   ToolResult,
   Tool,
   RunOptions,
-  Logger
+  Logger,
+  ParallelConfig
 } from './types';
 
 // Example default logger

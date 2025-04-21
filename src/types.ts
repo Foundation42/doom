@@ -96,6 +96,10 @@ export interface ParallelConfig {
   includeNested?: boolean;
   /** Maximum depth level to execute in parallel (default: 1, only root level) */
   maxDepth?: number;
+  /** Whether to continue execution if a subtask fails (default: false) */
+  continueOnError?: boolean;
+  /** Whether to preserve original order in results regardless of completion time (default: true) */
+  preserveOrder?: boolean;
 }
 
 /**

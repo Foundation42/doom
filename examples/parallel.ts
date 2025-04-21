@@ -109,6 +109,30 @@ const createAsyncTool = (name: string, baseDelayMs: number): Tool => ({
   }
 });
 
+// Create a failing tool for error handling demonstration
+const createFailingTool = (name: string, failAfterMs: number): Tool => ({
+  name,
+  description: `A service that fails after ${failAfterMs}ms`,
+  parameters: {
+    type: 'object',
+    properties: {
+      id: { type: 'string', description: 'ID to look up' }
+    },
+    required: ['id'],
+    additionalProperties: false
+  },
+  func: async (args: { id: string }): Promise<ToolResult> => {
+    logger.info(`⏱️ ${name} - Starting request for ID: ${args.id} (will fail after ${failAfterMs}ms)`);
+    
+    // Simulate delay before failure
+    await new Promise(resolve => setTimeout(resolve, failAfterMs));
+    
+    // Simulate failure
+    logger.info(`❌ ${name} - Failing as expected`);
+    throw new Error(`${name} failed as expected for ID: ${args.id}`);
+  }
+});
+
 // Create several tools with different response times
 const tools: Tool[] = [
   createAsyncTool('PrimaryService', 1000),
@@ -117,6 +141,7 @@ const tools: Tool[] = [
   createAsyncTool('SecondaryService3', 1000),
   createAsyncTool('TertiaryService', 800),
   createAsyncTool('SlowService', 3000),
+  createFailingTool('FailingService', 500),
 ];
 
 // Function to run a benchmark with a specific configuration
@@ -132,7 +157,7 @@ async function runBenchmark(parallel: ParallelConfig | boolean) {
     },
     {
       role: 'user',
-      content: 'Retrieve data from the primary service and also the slow service.'
+      content: 'Retrieve data from the primary service, the slow service, and also try the failing service.'
     }
   ];
   
@@ -183,7 +208,9 @@ async function main() {
   const parallelTime = await runBenchmark({
     enabled: true,
     maxConcurrent: 4,
-    includeNested: true
+    includeNested: true,
+    continueOnError: true,
+    preserveOrder: true
   });
   
   // Show comparison
