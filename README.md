@@ -7,10 +7,13 @@ A TypeScript library for running chat sessions with OpenAI's tool-calling models
 - ✨ Tool calling with OpenAI's API
 - 🔄 Streaming responses
 - 🧩 Subtasks for automatic task orchestration
+- ⚡ Parallel execution of subtasks
 - 🔁 Retry logic for transient errors
 - ⏱️ Timeout handling
 - 🛑 Cancellation via AbortSignal
 - 🛠️ Error-resistant JSON parsing
+- 📊 Customizable logging
+- 🔍 Parent-child relationship tracking
 
 ## Installation
 
@@ -35,6 +38,9 @@ npm run repl
 
 # Run the subtasks example
 npm run subtasks
+
+# Run the parallel execution benchmark
+npm run parallel
 ```
 
 ### API Key Configuration
@@ -111,9 +117,57 @@ const getUserProfileTool = {
 };
 ```
 
-The subtasks will be executed in order, and their results will be included in the conversation context. Subtasks can also return their own subtasks, creating a flexible workflow tree.
+The subtasks will be executed in order (or in parallel if configured), and their results will be included in the conversation context. Subtasks can also return their own subtasks, creating a flexible workflow tree.
 
-## Configuration Options
+### Parallel Execution
+
+You can significantly improve performance by enabling parallel execution of subtasks:
+
+```typescript
+// Simple boolean flag for default parallel settings
+const result = await runChatWithTools(messages, tools, { parallel: true });
+
+// Or with detailed configuration
+const result = await runChatWithTools(messages, tools, {
+  parallel: {
+    enabled: true,              // Enable parallel execution
+    maxConcurrent: 4,           // Maximum concurrent tasks
+    includeNested: true,        // Run nested subtasks in parallel too
+    maxDepth: 2                 // Maximum depth level for parallelism
+  }
+});
+```
+
+Parallel execution is especially useful when:
+1. You have multiple independent subtasks that don't depend on each other
+2. Your tools perform network requests or other I/O operations
+3. You need to process many subtasks quickly
+
+The `maxConcurrent` setting helps control resource usage by limiting how many tasks run at once.
+
+## Custom Logging
+
+ChatRunner supports custom loggers for better integration with your application's logging system:
+
+```typescript
+import { createConsoleLogger } from 'chatrunner';
+
+// Create a custom logger
+const myLogger = {
+  debug: (message, ...args) => console.debug(`[DEBUG] ${message}`, ...args),
+  info: (message, ...args) => console.log(`[INFO] ${message}`, ...args),
+  warn: (message, ...args) => console.warn(`[WARNING] ${message}`, ...args),
+  error: (message, ...args) => console.error(`[ERROR] ${message}`, ...args)
+};
+
+// Or use the built-in helper
+const consoleLogger = createConsoleLogger('MyApp:', 'info');
+
+// Pass the logger in options
+const result = await runChatWithTools(messages, tools, { logger: myLogger });
+```
+
+## Full Configuration Options
 
 ```typescript
 const options = {
@@ -123,6 +177,13 @@ const options = {
   retryDelayMs: 1000,           // Base delay before retry attempts
   signal: abortController.signal, // AbortSignal for cancellation
   timeoutMs: 30000,             // Timeout in milliseconds
+  logger: customLogger,         // Custom logger implementation
+  parallel: {                   // Parallel execution configuration
+    enabled: true,              // Enable parallel execution
+    maxConcurrent: 4,           // Maximum concurrent tasks
+    includeNested: true,        // Run nested subtasks in parallel too
+    maxDepth: 2                 // Maximum depth level for parallelism
+  }
 };
 
 const result = await runChatWithTools(messages, tools, options);
