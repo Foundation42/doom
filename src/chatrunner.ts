@@ -95,10 +95,19 @@ export async function runChatWithTools(
               tool_call_id: callId
             });
 
-            // Process any sub-tasks recursively
+            // Process any sub-tasks (with parallel execution if configured)
             if (toolResult.subTasks && toolResult.subTasks.length > 0) {
               logger.info(`Processing ${toolResult.subTasks.length} subtasks for ${name}`);
-              await executeSubTasks(toolResult.subTasks, toolMap, messages, { ...options, parentCallId: callId });
+              await executeSubTasks(
+                toolResult.subTasks, 
+                toolMap, 
+                messages, 
+                { 
+                  ...options, 
+                  parentCallId: callId,
+                  executionDepth: 0  // Root level for subtasks
+                }
+              );
             }
           } catch (error) {
             // Handle tool execution errors
@@ -138,85 +147,158 @@ export async function runChatWithTools(
 }
 
 /**
- * Executes an array of sub-tasks sequentially, feeding results back into the conversation.
+ * Executes a single subtask and adds its result to the conversation.
+ * @returns The call ID used for this task
+ */
+async function executeOneSubTask(
+  task: SubTask,
+  toolMap: Map<string, Tool>,
+  messages: Message[],
+  options: RunOptions & { parentCallId?: string, executionDepth?: number }
+): Promise<string | null> {
+  const logger = options.logger || defaultLogger;
+  const executionDepth = options.executionDepth || 0;
+  
+  logger.debug(`Executing subtask: ${task.toolName} with args:`, task.args);
+
+  // Find the tool by name
+  const tool = toolMap.get(task.toolName);
+  if (!tool) {
+    logger.error(`Available tools: ${Array.from(toolMap.keys()).join(', ')}`);
+    throw new Error(`SubTask tool '${task.toolName}' not found`);
+  }
+
+  try {
+    // Invoke the tool
+    const toolResult = await tool.func(task.args);
+
+    // Generate a unique call ID for this subtask
+    const callId = `task_${Math.random().toString(36).substring(2, 9)}`;
+    logger.debug(`Adding subtask result to conversation: ${callId}`);
+
+    // Append invocation and output to conversation
+    messages.push({
+      role: 'assistant',
+      content: null,
+      tool_calls: [{
+        id: callId,
+        type: 'function',
+        parentCallId: options.parentCallId, // Track parent call
+        function: {
+          name: task.toolName,
+          arguments: task.args ? JSON.stringify(task.args) : "{}"
+        }
+      }]
+    });
+
+    messages.push({
+      role: 'tool',
+      content: toolResult.output,
+      tool_call_id: callId
+    });
+
+    // Recursively handle nested subTasks
+    if (toolResult.subTasks && toolResult.subTasks.length > 0) {
+      logger.info(`Processing ${toolResult.subTasks.length} nested subtasks for ${task.toolName}`);
+      await executeSubTasks(
+        toolResult.subTasks, 
+        toolMap, 
+        messages, 
+        { 
+          ...options, 
+          parentCallId: callId,
+          executionDepth: executionDepth + 1
+        }
+      );
+    }
+    
+    return callId;
+  } catch (error) {
+    // Handle tool execution errors
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error(`Error executing subtask ${task.toolName}: ${errorMessage}`);
+    
+    // Add error message as tool result
+    const callId = `task_${Math.random().toString(36).substring(2, 9)}`;
+    messages.push({
+      role: 'assistant',
+      content: null,
+      tool_calls: [{
+        id: callId,
+        type: 'function',
+        parentCallId: options.parentCallId,
+        function: {
+          name: task.toolName,
+          arguments: task.args ? JSON.stringify(task.args) : "{}"
+        }
+      }]
+    });
+
+    messages.push({
+      role: 'tool',
+      content: `Error: ${errorMessage}`,
+      tool_call_id: callId
+    });
+    
+    return callId;
+  }
+}
+
+/**
+ * Executes an array of sub-tasks, feeding results back into the conversation.
+ * Supports both sequential and parallel execution modes.
  */
 async function executeSubTasks(
   subTasks: SubTask[],
   toolMap: Map<string, Tool>,
   messages: Message[],
-  options: RunOptions & { parentCallId?: string }
+  options: RunOptions & { parentCallId?: string, executionDepth?: number }
 ): Promise<void> {
   const logger = options.logger || defaultLogger;
+  const executionDepth = options.executionDepth || 0;
   
-  for (const task of subTasks) {
-    logger.debug(`Executing subtask: ${task.toolName} with args:`, task.args);
-
-    // Find the tool by name
-    const tool = toolMap.get(task.toolName);
-    if (!tool) {
-      logger.error(`Available tools: ${Array.from(toolMap.keys()).join(', ')}`);
-      throw new Error(`SubTask tool '${task.toolName}' not found`);
-    }
-
-    try {
-      // Invoke the tool
-      const toolResult = await tool.func(task.args);
-
-      // Generate a unique call ID for this subtask
-      const callId = `task_${Math.random().toString(36).substring(2, 9)}`;
-      logger.debug(`Adding subtask result to conversation: ${callId}`);
-
-      // Append invocation and output to conversation
-      messages.push({
-        role: 'assistant',
-        content: null,
-        tool_calls: [{
-          id: callId,
-          type: 'function',
-          parentCallId: options.parentCallId, // Track parent call
-          function: {
-            name: task.toolName,
-            arguments: task.args ? JSON.stringify(task.args) : "{}"
-          }
-        }]
-      });
-
-      messages.push({
-        role: 'tool',
-        content: toolResult.output,
-        tool_call_id: callId
-      });
-
-      // Recursively handle nested subTasks
-      if (toolResult.subTasks && toolResult.subTasks.length > 0) {
-        logger.info(`Processing ${toolResult.subTasks.length} nested subtasks for ${task.toolName}`);
-        await executeSubTasks(toolResult.subTasks, toolMap, messages, { ...options, parentCallId: callId });
-      }
-    } catch (error) {
-      // Handle tool execution errors
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error(`Error executing subtask ${task.toolName}: ${errorMessage}`);
+  // Determine if we should run in parallel
+  let parallelConfig: ParallelConfig = { enabled: false };
+  
+  if (typeof options.parallel === 'boolean') {
+    parallelConfig = { enabled: options.parallel };
+  } else if (options.parallel) {
+    parallelConfig = options.parallel;
+  }
+  
+  // Check if we should run in parallel at this depth level
+  const shouldRunParallel = parallelConfig.enabled && 
+    (executionDepth === 0 || parallelConfig.includeNested) &&
+    (parallelConfig.maxDepth === undefined || executionDepth <= parallelConfig.maxDepth);
+  
+  if (shouldRunParallel) {
+    logger.info(`Executing ${subTasks.length} subtasks in parallel mode`);
+    
+    // Determine batch size for concurrent tasks
+    const maxConcurrent = parallelConfig.maxConcurrent || 4;
+    
+    // Process tasks in batches
+    for (let i = 0; i < subTasks.length; i += maxConcurrent) {
+      const batch = subTasks.slice(i, i + maxConcurrent);
       
-      // Add error message as tool result
-      const callId = `task_${Math.random().toString(36).substring(2, 9)}`;
-      messages.push({
-        role: 'assistant',
-        content: null,
-        tool_calls: [{
-          id: callId,
-          type: 'function',
-          parentCallId: options.parentCallId,
-          function: {
-            name: task.toolName,
-            arguments: task.args ? JSON.stringify(task.args) : "{}"
-          }
-        }]
-      });
-
-      messages.push({
-        role: 'tool',
-        content: `Error: ${errorMessage}`,
-        tool_call_id: callId
+      // Execute each task in this batch concurrently
+      logger.debug(`Running parallel batch of ${batch.length} tasks`);
+      const promises = batch.map(task => executeOneSubTask(task, toolMap, messages, {
+        ...options,
+        executionDepth
+      }));
+      
+      // Wait for all tasks in this batch to complete
+      await Promise.all(promises);
+    }
+  } else {
+    // Sequential execution
+    logger.debug(`Executing ${subTasks.length} subtasks sequentially`);
+    
+    for (const task of subTasks) {
+      await executeOneSubTask(task, toolMap, messages, {
+        ...options,
+        executionDepth
       });
     }
   }

@@ -9,7 +9,8 @@
     "lint": "eslint . --ext .ts",
     "test": "jest",
     "repl": "ts-node examples/repl.ts",
-    "subtasks": "ts-node examples/subtasks.ts"
+    "subtasks": "ts-node examples/subtasks.ts",
+    "parallel": "ts-node examples/parallel.ts"
   },
   "dependencies": {
     "abort-controller": "^3.0.0",

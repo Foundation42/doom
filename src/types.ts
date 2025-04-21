@@ -85,6 +85,20 @@ export interface Logger {
 }
 
 /**
+ * Configuration for parallel task execution
+ */
+export interface ParallelConfig {
+  /** Whether to execute subtasks in parallel (default: false) */
+  enabled: boolean;
+  /** Maximum number of concurrent subtasks (default: 4) */
+  maxConcurrent?: number;
+  /** Whether to run nested subtasks in parallel (default: false) */
+  includeNested?: boolean;
+  /** Maximum depth level to execute in parallel (default: 1, only root level) */
+  maxDepth?: number;
+}
+
+/**
  * Options for running the chat, including cancellation and retry settings.
  */
 export interface RunOptions {
@@ -102,4 +116,6 @@ export interface RunOptions {
   timeoutMs?: number;
   /** Custom logger implementation. */
   logger?: Logger;
+  /** Configuration for parallel task execution */
+  parallel?: ParallelConfig | boolean;
 }
