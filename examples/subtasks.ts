@@ -38,8 +38,26 @@ function loadEnvFromHomeDir() {
 // Create a logger for the subtasks example
 const logger = createConsoleLogger('', 'info');
 
+// Define types for our data store
+interface UserPreferences {
+  categories: string[];
+  notifications: boolean;
+}
+
+interface User {
+  name: string;
+  email: string;
+  accountType: string;
+  memberSince: string;
+  preferences: UserPreferences;
+}
+
+interface UserStore {
+  [key: string]: User;
+}
+
 // Define user data store (simulating a database)
-const userStore = {
+const userStore: UserStore = {
   'user123': {
     name: 'John Doe',
     email: 'john.doe@example.com',
@@ -206,8 +224,29 @@ const tools: Tool[] = [
       await new Promise(resolve => setTimeout(resolve, 300));
       
       try {
+        // Define shipping detail types
+        interface DeliveredShipment {
+          status: 'Delivered';
+          carrier: string;
+          tracking: string;
+          delivered: string;
+        }
+        
+        interface InTransitShipment {
+          status: 'In Transit';
+          carrier: string;
+          tracking: string;
+          estimatedDelivery: string;
+        }
+        
+        type Shipment = DeliveredShipment | InTransitShipment;
+        
+        interface ShippingDetails {
+          [orderId: string]: Shipment;
+        }
+        
         // Shipping details based on order ID
-        const shippingDetails = {
+        const shippingDetails: ShippingDetails = {
           '1001': {
             status: 'Delivered',
             carrier: 'FedEx',
@@ -228,7 +267,7 @@ const tools: Tool[] = [
           }
         };
         
-        const details = shippingDetails[args.orderId as keyof typeof shippingDetails];
+        const details = shippingDetails[args.orderId];
         
         if (!details) {
           return {
@@ -288,8 +327,18 @@ const tools: Tool[] = [
           };
         }
         
+        // Define product recommendation types
+        interface Product {
+          name: string;
+          price: number;
+        }
+        
+        interface ProductRecommendations {
+          [category: string]: Product[];
+        }
+        
         // Recommendations based on user preferences
-        const allRecommendations = {
+        const allRecommendations: ProductRecommendations = {
           electronics: [
             { name: 'Wireless Charging Pad', price: 34.99 },
             { name: 'Bluetooth Speaker', price: 79.99 },
@@ -307,19 +356,37 @@ const tools: Tool[] = [
             { name: 'Sunglasses', price: 129.99 },
             { name: 'Watch', price: 199.99 },
             { name: 'Backpack', price: 79.99 }
+          ],
+          books: [
+            { name: 'Bestselling Novel', price: 24.99 },
+            { name: 'Cookbook', price: 29.99 },
+            { name: 'Biography', price: 19.99 },
+            { name: 'Self-Help Book', price: 15.99 }
+          ],
+          beauty: [
+            { name: 'Face Cream', price: 39.99 },
+            { name: 'Perfume', price: 89.99 },
+            { name: 'Hair Styling Kit', price: 49.99 },
+            { name: 'Makeup Palette', price: 59.99 }
+          ],
+          sports: [
+            { name: 'Running Shoes', price: 129.99 },
+            { name: 'Yoga Mat', price: 45.99 },
+            { name: 'Fitness Tracker', price: 99.99 },
+            { name: 'Water Bottle', price: 19.99 }
           ]
         };
         
         // Filter by category if provided
-        let recommendations: Array<{ name: string, price: number }> = [];
+        let recommendations: Product[] = [];
         
-        if (args.category && allRecommendations[args.category as keyof typeof allRecommendations]) {
-          recommendations = allRecommendations[args.category as keyof typeof allRecommendations];
+        if (args.category && allRecommendations[args.category]) {
+          recommendations = allRecommendations[args.category];
         } else {
           // Use user preferences to select recommendations
           for (const category of user.preferences.categories) {
-            if (allRecommendations[category as keyof typeof allRecommendations]) {
-              recommendations.push(...allRecommendations[category as keyof typeof allRecommendations].slice(0, 2));
+            if (allRecommendations[category]) {
+              recommendations.push(...allRecommendations[category].slice(0, 2));
             }
           }
         }
