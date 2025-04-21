@@ -1,4 +1,4 @@
-import { runChatWithTools } from '../src/chatrunner';
+import { runChatWithTools, createConsoleLogger, validateToolArgs } from '../src';
 import { Message, Tool, ToolResult, SubTask } from '../src/types';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -35,6 +35,33 @@ function loadEnvFromHomeDir() {
   }
 }
 
+// Create a logger for the subtasks example
+const logger = createConsoleLogger('', 'info');
+
+// Define user data store (simulating a database)
+const userStore = {
+  'user123': {
+    name: 'John Doe',
+    email: 'john.doe@example.com',
+    accountType: 'premium',
+    memberSince: '2021-03-15',
+    preferences: {
+      categories: ['electronics', 'home', 'books'],
+      notifications: true
+    }
+  },
+  'user456': {
+    name: 'Jane Smith',
+    email: 'jane.smith@example.com',
+    accountType: 'standard',
+    memberSince: '2022-06-01',
+    preferences: {
+      categories: ['fashion', 'beauty', 'sports'],
+      notifications: false
+    }
+  }
+};
+
 // Define a set of tools that demonstrate subtasks
 const tools: Tool[] = [
   {
@@ -48,25 +75,56 @@ const tools: Tool[] = [
           description: 'User ID or username'
         }
       },
-      required: ['userId']
+      required: ['userId'],
+      additionalProperties: false
     },
     func: async (args: { userId: string }): Promise<ToolResult> => {
-      console.log(`📊 Getting user profile for ${args.userId}`);
+      logger.info(`Getting user profile for ${args.userId}`);
       
-      // Return the profile with subtasks to get more detailed information
-      return {
-        output: `Found user profile for ${args.userId}: name="John Doe", accountType="premium"`,
-        subTasks: [
-          { 
-            toolName: 'getOrderHistory', 
-            args: { userId: args.userId, limit: 3 } 
-          },
-          { 
-            toolName: 'getRecommendations', 
-            args: { userId: args.userId } 
-          }
-        ]
-      };
+      // Validate arguments against schema
+      const validation = validateToolArgs(args, tools[0].parameters);
+      if (!validation.valid) {
+        return {
+          output: `Error: Invalid arguments - ${validation.errors?.join(', ')}`
+        };
+      }
+      
+      // Fetch user data (with error handling)
+      try {
+        // Simulate network delay
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        const user = userStore[args.userId];
+        if (!user) {
+          return {
+            output: `User ${args.userId} not found`
+          };
+        }
+        
+        // Return the profile with subtasks to get more detailed information
+        return {
+          output: `Found user profile for ${args.userId}:
+- Name: ${user.name}
+- Account type: ${user.accountType}
+- Member since: ${user.memberSince}
+- Email: ${user.email}`,
+          subTasks: [
+            { 
+              toolName: 'getOrderHistory', 
+              args: { userId: args.userId, limit: 3 } 
+            },
+            { 
+              toolName: 'getRecommendations', 
+              args: { userId: args.userId } 
+            }
+          ]
+        };
+      } catch (error) {
+        logger.error(`Error fetching user profile: ${error}`);
+        return {
+          output: `Error retrieving user profile: ${error instanceof Error ? error.message : String(error)}`
+        };
+      }
     }
   },
   {
@@ -78,23 +136,56 @@ const tools: Tool[] = [
         userId: { type: 'string', description: 'User ID or username' },
         limit: { type: 'number', description: 'Maximum number of orders to return' }
       },
-      required: ['userId']
+      required: ['userId'],
+      additionalProperties: false
     },
     func: async (args: { userId: string, limit?: number }): Promise<ToolResult> => {
-      console.log(`🛒 Getting order history for ${args.userId}, limit=${args.limit || 'none'}`);
+      logger.info(`Getting order history for ${args.userId}, limit=${args.limit || 'none'}`);
       
-      return {
-        output: `Order history for ${args.userId} (last ${args.limit || 5} orders):
-- Order #1001: Wireless Headphones ($129.99) - June 12, 2023
-- Order #982: Smart Watch ($199.99) - May 3, 2023
-- Order #874: USB-C Cable 2-pack ($14.99) - April 17, 2023`,
-        subTasks: [
-          { 
-            toolName: 'getShippingDetails', 
-            args: { orderId: '1001' } 
-          }
-        ]
-      };
+      // Simulate network delay
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      try {
+        // Check if user exists
+        if (!userStore[args.userId]) {
+          return {
+            output: `User ${args.userId} not found`
+          };
+        }
+        
+        // Generate some sample orders
+        const orders = [
+          { id: '1001', date: 'June 12, 2023', item: 'Wireless Headphones', price: 129.99 },
+          { id: '982', date: 'May 3, 2023', item: 'Smart Watch', price: 199.99 },
+          { id: '874', date: 'April 17, 2023', item: 'USB-C Cable 2-pack', price: 14.99 },
+          { id: '763', date: 'March 5, 2023', item: 'Portable Power Bank', price: 49.99 },
+          { id: '698', date: 'February 22, 2023', item: 'Bluetooth Speaker', price: 89.99 }
+        ];
+        
+        // Apply limit
+        const limit = args.limit || 5;
+        const limitedOrders = orders.slice(0, limit);
+        
+        // Format order history
+        const orderHistoryText = limitedOrders.map(
+          order => `- Order #${order.id}: ${order.item} ($${order.price}) - ${order.date}`
+        ).join('\n');
+        
+        return {
+          output: `Order history for ${args.userId} (last ${limit} orders):\n${orderHistoryText}`,
+          subTasks: [
+            { 
+              toolName: 'getShippingDetails', 
+              args: { orderId: '1001' } 
+            }
+          ]
+        };
+      } catch (error) {
+        logger.error(`Error fetching order history: ${error}`);
+        return {
+          output: `Error retrieving order history: ${error instanceof Error ? error.message : String(error)}`
+        };
+      }
     }
   },
   {
@@ -105,16 +196,69 @@ const tools: Tool[] = [
       properties: {
         orderId: { type: 'string', description: 'Order ID' }
       },
-      required: ['orderId']
+      required: ['orderId'],
+      additionalProperties: false
     },
-    func: async (args: { orderId: string }): Promise<string> => {
-      console.log(`📦 Getting shipping details for order ${args.orderId}`);
+    func: async (args: { orderId: string }): Promise<ToolResult> => {
+      logger.info(`Getting shipping details for order ${args.orderId}`);
       
-      return `Shipping details for order #${args.orderId}:
-- Status: Delivered
-- Carrier: FedEx
-- Tracking #: FX92836192752
-- Delivered: June 15, 2023 at 2:45 PM`;
+      // Simulate network delay
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      try {
+        // Shipping details based on order ID
+        const shippingDetails = {
+          '1001': {
+            status: 'Delivered',
+            carrier: 'FedEx',
+            tracking: 'FX92836192752',
+            delivered: 'June 15, 2023 at 2:45 PM'
+          },
+          '982': {
+            status: 'In Transit',
+            carrier: 'UPS',
+            tracking: 'UPS1Z4572894572',
+            estimatedDelivery: 'May 7, 2023'
+          },
+          '874': {
+            status: 'Delivered',
+            carrier: 'USPS',
+            tracking: 'USPS9405503699300142783954',
+            delivered: 'April 21, 2023 at 11:20 AM'
+          }
+        };
+        
+        const details = shippingDetails[args.orderId as keyof typeof shippingDetails];
+        
+        if (!details) {
+          return {
+            output: `Shipping details for order #${args.orderId} not found`
+          };
+        }
+        
+        if (details.status === 'Delivered') {
+          return {
+            output: `Shipping details for order #${args.orderId}:
+- Status: ${details.status}
+- Carrier: ${details.carrier}
+- Tracking #: ${details.tracking}
+- Delivered: ${details.delivered}`
+          };
+        } else {
+          return {
+            output: `Shipping details for order #${args.orderId}:
+- Status: ${details.status}
+- Carrier: ${details.carrier}
+- Tracking #: ${details.tracking}
+- Estimated Delivery: ${details.estimatedDelivery}`
+          };
+        }
+      } catch (error) {
+        logger.error(`Error fetching shipping details: ${error}`);
+        return {
+          output: `Error retrieving shipping details: ${error instanceof Error ? error.message : String(error)}`
+        };
+      }
     }
   },
   {
@@ -123,21 +267,180 @@ const tools: Tool[] = [
     parameters: {
       type: 'object',
       properties: {
-        userId: { type: 'string', description: 'User ID or username' }
+        userId: { type: 'string', description: 'User ID or username' },
+        category: { type: 'string', description: 'Optional category filter' }
       },
-      required: ['userId']
+      required: ['userId'],
+      additionalProperties: false
     },
-    func: async (args: { userId: string }): Promise<string> => {
-      console.log(`🔍 Getting recommendations for ${args.userId}`);
+    func: async (args: { userId: string, category?: string }): Promise<ToolResult> => {
+      logger.info(`Getting recommendations for ${args.userId}${args.category ? ` in category ${args.category}` : ''}`);
       
-      return `Recommended products for ${args.userId}:
-1. Wireless Charging Pad ($34.99)
-2. Bluetooth Speaker ($79.99)
-3. Phone Case ($19.99)
-4. Screen Protector ($9.99)`;
+      // Simulate network delay
+      await new Promise(resolve => setTimeout(resolve, 400));
+      
+      try {
+        // Check if user exists
+        const user = userStore[args.userId];
+        if (!user) {
+          return {
+            output: `User ${args.userId} not found`
+          };
+        }
+        
+        // Recommendations based on user preferences
+        const allRecommendations = {
+          electronics: [
+            { name: 'Wireless Charging Pad', price: 34.99 },
+            { name: 'Bluetooth Speaker', price: 79.99 },
+            { name: 'Noise-Cancelling Earbuds', price: 149.99 },
+            { name: 'Smart Home Hub', price: 129.99 }
+          ],
+          home: [
+            { name: 'Robot Vacuum', price: 299.99 },
+            { name: 'Air Purifier', price: 149.99 },
+            { name: 'Smart Light Bulbs (4-pack)', price: 59.99 },
+            { name: 'Coffee Maker', price: 89.99 }
+          ],
+          fashion: [
+            { name: 'Leather Wallet', price: 49.99 },
+            { name: 'Sunglasses', price: 129.99 },
+            { name: 'Watch', price: 199.99 },
+            { name: 'Backpack', price: 79.99 }
+          ]
+        };
+        
+        // Filter by category if provided
+        let recommendations: Array<{ name: string, price: number }> = [];
+        
+        if (args.category && allRecommendations[args.category as keyof typeof allRecommendations]) {
+          recommendations = allRecommendations[args.category as keyof typeof allRecommendations];
+        } else {
+          // Use user preferences to select recommendations
+          for (const category of user.preferences.categories) {
+            if (allRecommendations[category as keyof typeof allRecommendations]) {
+              recommendations.push(...allRecommendations[category as keyof typeof allRecommendations].slice(0, 2));
+            }
+          }
+        }
+        
+        // Format recommendations
+        const recommendationsText = recommendations
+          .slice(0, 4)
+          .map((item, index) => `${index + 1}. ${item.name} ($${item.price})`)
+          .join('\n');
+        
+        return {
+          output: `Recommended products for ${args.userId}:\n${recommendationsText}`
+        };
+      } catch (error) {
+        logger.error(`Error fetching recommendations: ${error}`);
+        return {
+          output: `Error retrieving recommendations: ${error instanceof Error ? error.message : String(error)}`
+        };
+      }
     }
   }
 ];
+
+/**
+ * Custom logger that formats tool tracing nicely for the console
+ */
+const traceLogger = {
+  debug: () => {}, // Skip debug logs
+  info: (message: string, ...args: any[]) => {
+    if (message.includes('Getting ')) {
+      // Format tool call nicely
+      if (message.includes('profile')) {
+        console.log(`\n📊 ${message}`, ...args);
+      } else if (message.includes('order history')) {
+        console.log(`\n🛒 ${message}`, ...args);
+      } else if (message.includes('shipping')) {
+        console.log(`\n📦 ${message}`, ...args);
+      } else if (message.includes('recommendations')) {
+        console.log(`\n🔍 ${message}`, ...args);
+      } else {
+        console.log(`\nℹ️ ${message}`, ...args);
+      }
+    } else if (message.includes('Processing')) {
+      // Format subtask processing
+      console.log(`\n⏩ ${message}`, ...args);
+    } else if (message.includes('Received')) {
+      console.log(`\n📩 ${message}`, ...args);
+    }
+  },
+  warn: (message: string, ...args: any[]) => {
+    console.warn(`\n⚠️ ${message}`, ...args);
+  },
+  error: (message: string, ...args: any[]) => {
+    console.error(`\n❌ ${message}`, ...args);
+  }
+};
+
+// Create a utility to track the execution tree visually
+const executionTracker = {
+  depth: 0,
+  toolCalls: [] as Array<{
+    id: string, 
+    name: string, 
+    parentId?: string,
+    args: any, 
+    result?: string
+  }>,
+  
+  startToolCall(id: string, name: string, args: any, parentId?: string) {
+    this.toolCalls.push({ id, name, args, parentId });
+    this.depth++;
+    const indent = '  '.repeat(this.depth - 1);
+    console.log(`\n${indent}🔽 Starting ${name}(${JSON.stringify(args)})`);
+  },
+  
+  endToolCall(id: string, result: string) {
+    const toolCall = this.toolCalls.find(tc => tc.id === id);
+    if (toolCall) {
+      toolCall.result = result;
+    }
+    const indent = '  '.repeat(this.depth - 1);
+    console.log(`${indent}🔼 Completed ${this.toolCalls.find(tc => tc.id === id)?.name}`);
+    this.depth--;
+  },
+  
+  printExecutionTree() {
+    console.log('\n📋 Execution Tree:');
+    
+    // Group by parent
+    const grouped: Record<string, typeof this.toolCalls> = {};
+    const roots: typeof this.toolCalls = [];
+    
+    // First pass - group by parent
+    for (const call of this.toolCalls) {
+      if (!call.parentId) {
+        roots.push(call);
+      } else {
+        if (!grouped[call.parentId]) {
+          grouped[call.parentId] = [];
+        }
+        grouped[call.parentId].push(call);
+      }
+    }
+    
+    // Recursive printer
+    const printNode = (node: typeof this.toolCalls[0], depth = 0) => {
+      const indent = '  '.repeat(depth);
+      console.log(`${indent}${node.name}(${JSON.stringify(node.args)})`);
+      
+      const children = grouped[node.id] || [];
+      for (const child of children) {
+        printNode(child, depth + 1);
+      }
+    };
+    
+    // Print each root
+    for (const root of roots) {
+      printNode(root);
+    }
+  }
+};
 
 async function main() {
   // Check for API key
@@ -155,31 +458,109 @@ async function main() {
   console.log('🤖 Subtasks Example');
   console.log('This example demonstrates how tools can spawn subtasks automatically.\n');
   
+  // Interactive mode - ask for a user ID
+  const readline = require('readline-sync');
+  console.log('Available user IDs: user123, user456');
+  const userId = readline.question('Enter a user ID to look up (default: user123): ') || 'user123';
+  
   // Initialize with system message
   const messages: Message[] = [
     { 
       role: 'system', 
-      content: 'You are an AI assistant for an e-commerce platform. You can look up user profiles, order history, and recommendations.' 
+      content: 'You are an AI assistant for an e-commerce platform. You can look up user profiles, order history, and recommendations. Be concise but comprehensive.' 
     },
     {
       role: 'user',
-      content: 'Tell me about user123\'s profile and recent purchases.'
+      content: `Tell me about ${userId}'s profile, recent purchases, and what products they might like.`
     }
   ];
     
   try {
-    console.log('🔄 Running chat with tools and subtasks...\n');
+    console.log('\n🔄 Running chat with tools and subtasks...');
       
-    // Run chat with tools (no need for user input in this example)
-    const response = await runChatWithTools(messages, tools, {
+    // Create a wrapped version of each tool that tracks execution
+    // We need a recursive wrapper that correctly tracks parent-child relationships
+    function createTrackedTool(tool: Tool, parentId?: string): Tool {
+      return {
+        ...tool,
+        func: async (args: any) => {
+          const id = `call_${Math.random().toString(36).substring(2, 9)}`;
+          executionTracker.startToolCall(id, tool.name, args, parentId);
+          
+          try {
+            // Call the original tool function
+            const result = await tool.func(args);
+            
+            // Process the result
+            if (typeof result === 'string') {
+              executionTracker.endToolCall(id, result);
+              return { output: result };
+            } else {
+              executionTracker.endToolCall(id, result.output);
+              
+              // Process subtasks if any
+              if (result.subTasks && result.subTasks.length > 0) {
+                // Create a new result with tracked subtasks
+                const trackedSubTasks = result.subTasks.map(subTask => {
+                  const subTool = tools.find(t => t.name === subTask.toolName);
+                  if (!subTool) {
+                    throw new Error(`SubTask tool '${subTask.toolName}' not found`);
+                  }
+                  
+                  // Create a tracked version of the subtask
+                  const trackedSubTool = createTrackedTool(subTool, id);
+                  
+                  return {
+                    ...subTask,
+                    originalToolName: subTask.toolName,
+                    toolName: subTask.toolName,
+                    // Replace the tool with our tracked version when it executes
+                    _trackedTool: trackedSubTool
+                  };
+                });
+                
+                return {
+                  ...result,
+                  subTasks: trackedSubTasks
+                };
+              }
+              
+              return result;
+            }
+          } catch (error) {
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            executionTracker.endToolCall(id, `Error: ${errorMsg}`);
+            throw error;
+          }
+        }
+      };
+    }
+    
+    // Map all tools to their tracked versions
+    const trackedTools = tools.map(tool => createTrackedTool(tool));
+    
+    // Run chat with tools
+    const response = await runChatWithTools(messages, trackedTools, {
       temperature: 0.7,
-      modelName: 'gpt-4o-mini'
+      modelName: 'gpt-4o-mini',
+      logger: traceLogger,
+      timeoutMs: 30000,
+      maxRetries: 2
     });
     
     console.log(`\n🤖 Assistant's final response:\n${response}`);
+    
+    // Option to show the execution tree
+    const showTree = readline.keyInYN('\nWould you like to see the execution tree?');
+    if (showTree) {
+      executionTracker.printExecutionTree();
+    }
       
   } catch (error) {
     console.error(`\n❌ Error: ${error instanceof Error ? error.message : String(error)}`);
+    if (error instanceof Error && error.message.includes('timeout')) {
+      console.log('The request timed out. You might want to try again or check your API key.');
+    }
   }
 }
 
