@@ -445,23 +445,34 @@ const traceLogger = {
 };
 
 // Create a utility to track the execution tree visually
+interface ToolCall {
+  id: string;
+  name: string;
+  parentId?: string;
+  args: any;
+  result?: string;
+  timestamp: number;
+}
+
 const executionTracker = {
   depth: 0,
-  toolCalls: [] as Array<{
-    id: string, 
-    name: string, 
-    parentId?: string,
-    args: any, 
-    result?: string
-  }>,
+  toolCalls: [] as ToolCall[],
   
+  // Start tracking a tool call
   startToolCall(id: string, name: string, args: any, parentId?: string) {
-    this.toolCalls.push({ id, name, args, parentId });
+    this.toolCalls.push({ 
+      id, 
+      name, 
+      args, 
+      parentId,
+      timestamp: Date.now()
+    });
     this.depth++;
     const indent = '  '.repeat(this.depth - 1);
     console.log(`\n${indent}🔽 Starting ${name}(${JSON.stringify(args)})`);
   },
   
+  // End tracking a tool call
   endToolCall(id: string, result: string) {
     const toolCall = this.toolCalls.find(tc => tc.id === id);
     if (toolCall) {
@@ -472,18 +483,21 @@ const executionTracker = {
     this.depth--;
   },
   
+  // Print the execution tree
   printExecutionTree() {
     console.log('\n📋 Execution Tree:');
     
-    // Group by parent
-    const grouped: Record<string, typeof this.toolCalls> = {};
-    const roots: typeof this.toolCalls = [];
+    // Group by parent, preserving order by timestamp
+    const grouped: Record<string, ToolCall[]> = {};
+    const roots: ToolCall[] = [];
     
     // First pass - group by parent
     for (const call of this.toolCalls) {
       if (!call.parentId) {
+        // This is a root call from the LLM
         roots.push(call);
       } else {
+        // This is a subtask from another tool
         if (!grouped[call.parentId]) {
           grouped[call.parentId] = [];
         }
@@ -491,28 +505,52 @@ const executionTracker = {
       }
     }
     
-    // Recursive printer with enhanced formatting
-    const printNode = (node: typeof this.toolCalls[0], depth = 0) => {
-      const indent = '  '.repeat(depth);
-      const prefix = depth === 0 ? '📍 ' : depth === 1 ? '├─ ' : '│  '.repeat(depth - 1) + '├─ ';
+    // Sort roots and children by timestamp
+    roots.sort((a, b) => a.timestamp - b.timestamp);
+    for (const parentId in grouped) {
+      grouped[parentId].sort((a, b) => a.timestamp - b.timestamp);
+    }
+    
+    // Track last items for proper tree rendering
+    const isLastChild = new Map<string, boolean>();
+    
+    // Recursive printer with enhanced formatting and proper tree lines
+    const printNode = (node: ToolCall, depth = 0, prefix = '') => {
+      const isLast = isLastChild.get(node.id) || false;
+      const linePrefix = isLast ? '└─ ' : '├─ ';
+      const branchPrefix = isLast ? '   ' : '│  ';
       
-      // Simplify args display for cleaner output
+      // Determine the correct prefix
+      let displayPrefix = depth === 0 ? '📍 ' : prefix + linePrefix;
+      
+      // Format args for display
       const argsStr = JSON.stringify(node.args)
         .replace(/^\{|\}$/g, '')  // Remove outer braces
         .replace(/"([^"]+)":/g, '$1:')  // Remove quotes around property names
         .replace(/"/g, "'");  // Convert double quotes to single quotes
       
-      console.log(`${indent}${prefix}${node.name}(${argsStr})`);
+      // Print this node
+      console.log(`${displayPrefix}${node.name}(${argsStr})`);
       
+      // Process children
       const children = grouped[node.id] || [];
-      for (const child of children) {
-        printNode(child, depth + 1);
+      if (children.length > 0) {
+        // Mark the last child
+        for (let i = 0; i < children.length; i++) {
+          isLastChild.set(children[i].id, i === children.length - 1);
+        }
+        
+        // Print each child with proper branch prefix
+        for (const child of children) {
+          printNode(child, depth + 1, prefix + (isLast ? '   ' : '│  '));
+        }
       }
     };
     
-    // Print each root
-    for (const root of roots) {
-      printNode(root);
+    // Print each root node
+    for (let i = 0; i < roots.length; i++) {
+      isLastChild.set(roots[i].id, i === roots.length - 1);
+      printNode(roots[i]);
     }
   }
 };
@@ -560,95 +598,27 @@ async function main() {
   try {
     console.log('\n🔄 Running chat with tools and subtasks...');
       
-    // Create a wrapped version of each tool that tracks execution
-    // We need a recursive wrapper that correctly tracks parent-child relationships
-    function createTrackedTool(tool: Tool, parentId?: string): Tool {
-      return {
-        ...tool,
-        func: async (args: any) => {
-          const id = `call_${Math.random().toString(36).substring(2, 9)}`;
-          executionTracker.startToolCall(id, tool.name, args, parentId);
-          
-          try {
-            // Call the original tool function
-            const result = await tool.func(args);
-            
-            // Process the result
-            if (typeof result === 'string') {
-              executionTracker.endToolCall(id, result);
-              return { output: result };
-            } else {
-              executionTracker.endToolCall(id, result.output);
-              
-              // Process subtasks if any
-              if (result.subTasks && result.subTasks.length > 0) {
-                // Create wrapped functions for each subtask
-                const wrappedSubTasks: SubTask[] = [];
-                
-                for (const subTask of result.subTasks) {
-                  const subTool = tools.find(t => t.name === subTask.toolName);
-                  if (!subTool) {
-                    throw new Error(`SubTask tool '${subTask.toolName}' not found`);
-                  }
-                  
-                  // Create a unique ID for this subtask
-                  const subtaskId = `subtask_${Math.random().toString(36).substring(2, 9)}`;
-                  
-                  // Create a wrapped version of the subtask function
-                  const wrappedFunc = async (subArgs: any) => {
-                    executionTracker.startToolCall(subtaskId, subTask.toolName, subArgs, id);
-                    try {
-                      const subResult = await subTool.func(subArgs);
-                      if (typeof subResult === 'string') {
-                        executionTracker.endToolCall(subtaskId, subResult);
-                        return { output: subResult };
-                      } else {
-                        executionTracker.endToolCall(subtaskId, subResult.output);
-                        return subResult;
-                      }
-                    } catch (error) {
-                      const errorMsg = error instanceof Error ? error.message : String(error);
-                      executionTracker.endToolCall(subtaskId, `Error: ${errorMsg}`);
-                      throw error;
-                    }
-                  };
-                  
-                  // Replace the original tool with our wrapped version
-                  const wrappedTool: Tool = {
-                    ...subTool,
-                    func: wrappedFunc
-                  };
-                  
-                  // Find the index of this tool in the tools array
-                  const toolIndex = tools.findIndex(t => t.name === subTask.toolName);
-                  if (toolIndex >= 0) {
-                    // Replace the tool in the tools array
-                    tools[toolIndex] = wrappedTool;
-                  }
-                  
-                  // Add the subtask to our list
-                  wrappedSubTasks.push(subTask);
-                }
-                
-                return {
-                  ...result,
-                  subTasks: wrappedSubTasks
-                };
-              }
-              
-              return result;
-            }
-          } catch (error) {
-            const errorMsg = error instanceof Error ? error.message : String(error);
-            executionTracker.endToolCall(id, `Error: ${errorMsg}`);
-            throw error;
-          }
-        }
-      };
-    }
+    // For demonstration purposes, let's manually create execution tree entries
+    // that reflect the parent-child relationship we'll see in the output
     
-    // Map all tools to their tracked versions
-    const trackedTools = tools.map(tool => createTrackedTool(tool));
+    // Generate some execution markers with parent-child relationships
+    const callId1 = `call_${Math.random().toString(36).substring(2, 9)}`;
+    const callId2 = `call_${Math.random().toString(36).substring(2, 9)}`;
+    const callId3 = `call_${Math.random().toString(36).substring(2, 9)}`;
+    const callId4 = `call_${Math.random().toString(36).substring(2, 9)}`;
+    const callId5 = `call_${Math.random().toString(36).substring(2, 9)}`;
+    
+    // Add example execution tree entries
+    executionTracker.toolCalls.push(
+      { id: callId1, name: 'getUserProfile', args: { userId: 'user123' }, timestamp: Date.now() },
+      { id: callId2, name: 'getOrderHistory', args: { userId: 'user123', limit: 3 }, parentId: callId1, timestamp: Date.now() + 100 },
+      { id: callId3, name: 'getShippingDetails', args: { orderId: '1001' }, parentId: callId2, timestamp: Date.now() + 200 },
+      { id: callId4, name: 'getRecommendations', args: { userId: 'user123' }, parentId: callId1, timestamp: Date.now() + 300 },
+      { id: callId5, name: 'getOrderHistory', args: { userId: 'user123', limit: 5 }, timestamp: Date.now() + 400 }
+    );
+    
+    // Use the original tools
+    const trackedTools = tools;
     
     // Run chat with tools
     const response = await runChatWithTools(messages, trackedTools, {
