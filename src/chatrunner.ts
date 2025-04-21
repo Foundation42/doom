@@ -1,6 +1,6 @@
 import fetch, { Response } from 'node-fetch';
 import { AbortController } from 'abort-controller';
-import { Message, Tool, RunOptions, SubTask, ToolResult, Logger } from './types';
+import { Message, Tool, RunOptions, SubTask, ToolResult, Logger, ParallelConfig } from './types';
 import { TextDecoder } from 'util';
 import { Readable } from 'stream';
 
