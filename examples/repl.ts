@@ -10,16 +10,16 @@ function loadEnvFromHomeDir() {
   try {
     const homedir = os.homedir();
     const envPath = path.join(homedir, '.env');
-    
+
     if (fs.existsSync(envPath)) {
       const envContent = fs.readFileSync(envPath, 'utf8');
       const envLines = envContent.split('\n');
-      
+
       for (const line of envLines) {
         const trimmedLine = line.trim();
         // Skip comments and empty lines
         if (!trimmedLine || trimmedLine.startsWith('#')) continue;
-        
+
         const match = trimmedLine.match(/^(OPENAI_API_KEY)=(.*)$/);
         if (match) {
           // Found the API key
@@ -39,23 +39,54 @@ function loadEnvFromHomeDir() {
 // Define some sample tools
 const tools: Tool[] = [
   {
-    name: 'getWeather',
-    description: 'Get current weather for a location',
+    name: 'get_weather',
+    description: 'Get current temperature for a given location.',
     parameters: {
       type: 'object',
       properties: {
-        location: { 
-          type: 'string', 
-          description: 'City name or location'
+        city: {
+          type: 'string',
+          description: 'City e.g. Bogotá'
+        },
+        country: {
+          type: 'string',
+          description: 'Country e.g. Colombia'
         }
       },
-      required: ['location']
+      required: [
+        'location'
+      ],
+      additionalProperties: false
     },
-    func: async (args: { location: string }) => {
-      // In a real app, this would call a weather API
-      return `It's currently 72°F and sunny in ${args.location}.`;
+    func: async (args: { city: string, country: string }) => {
+      switch (args.city.toLowerCase()) {
+        case 'new york':
+          return `It's currently 75°F and sunny in ${args.city}.`;
+        case 'los angeles':
+          return `It's currently 80°F and sunny in ${args.city}.`;
+        case 'chicago':
+          return `It's currently 65°F and cloudy in ${args.city}.`;
+        case 'london':
+          return `It's currently 60°F and rainy in ${args.city}.`;
+        case 'tokyo':
+          return `It's currently 70°F and partly cloudy in ${args.city}.`;
+        case 'paris':
+          return `It's currently 68°F and overcast in ${args.city}.`;
+        case 'sydney':
+          return `It's currently 78°F and sunny in ${args.city}.`;
+        case 'mumbai':
+          return `It's currently 85°F and humid in ${args.city}.`;
+        case 'cairo':
+          return `It's currently 90°F and sunny in ${args.city}.`;
+        case 'moscow':
+          return `It's currently 55°F and cloudy in ${args.city}.`;
+        default:
+          // Fallback for any other city
+          return `Sorry, I don't have weather information for ${args.city}.`;
+      }
     }
   },
+  /*
   {
     name: 'calculateTip',
     description: 'Calculate tip amount for a bill',
@@ -71,7 +102,8 @@ const tools: Tool[] = [
           description: 'Tip percentage (15, 18, 20, etc.)' 
         }
       },
-      required: ['amount', 'percentage']
+      required: ['amount', 'percentage'],
+      additionalProperties: false
     },
     func: async (args: { amount: number, percentage: number }) => {
       const tipAmount = args.amount * (args.percentage / 100);
@@ -81,55 +113,58 @@ const tools: Tool[] = [
       };
     }
   }
+    */
 ];
 
 async function main() {
   console.log('🤖 ChatRunner REPL');
   console.log('Type your messages below. Type "exit" to quit.\n');
-  
+
   // Initialize with system message
   const messages: Message[] = [
-    { 
-      role: 'system', 
-      content: 'You are a helpful assistant with access to tools. Keep responses brief and focused.' 
+    {
+      role: 'system',
+      content: `You are a helpful assistant with access to tools.
+When using a tool, always provide any arguments that the tool needs that matches the tool's parameters schema.
+Keep responses brief and focused.`
     }
   ];
-  
+
   // REPL loop
   while (true) {
     // Get user input
     const userInput = readline.question('\n👤 You: ');
-    
+
     // Check for exit command
     if (userInput.toLowerCase() === 'exit') {
       console.log('👋 Goodbye!');
       break;
     }
-    
+
     // Add user message to history
     messages.push({
       role: 'user',
       content: userInput
     });
-    
+
     try {
       console.log('\n🤔 Assistant is thinking...');
-      
+
       // Create AbortController for timeout
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000);
-      
+
       // Run chat with tools
       const response = await runChatWithTools(messages, tools, {
         signal: controller.signal,
         temperature: 0.7
       });
-      
+
       clearTimeout(timeoutId);
-      
+
       // Print response
       console.log(`\n🤖 Assistant: ${response}`);
-      
+
       // Add assistant response to history
       messages.push({
         role: 'assistant',
@@ -148,7 +183,7 @@ async function main() {
 if (!process.env.OPENAI_API_KEY) {
   // Try to load from ~/.env
   const loaded = loadEnvFromHomeDir();
-  
+
   // If still not found, prompt user
   if (!loaded) {
     console.log('🔑 OpenAI API key not found in environment or ~/.env');
