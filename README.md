@@ -42,8 +42,14 @@ npm run subtasks
 # Run the parallel execution benchmark
 npm run parallel
 
-# Explore the standard tools library
+# Explore the standard tools library (requires OpenAI API key)
 npm run tools
+
+# Run basic tools demo locally (no API key needed)
+npm run tools:local
+
+# Run advanced tools demo locally (no API key needed)
+npm run tools:advanced
 ```
 
 ### API Key Configuration
@@ -236,6 +242,27 @@ const result = await runChatWithTools(messages, allTools);
    - `translate`: Simulates language translation
    - `stringUtils`: Provides string manipulation operations
    - `cryptoHash`: Performs hashing, encoding, and generation operations
+
+4. **File Tools**
+   - `readFile`: Reads content from files with encoding and limit options
+   - `writeFile`: Writes or appends content to files
+   - `listFiles`: Lists files in directories with filtering options
+   - `fileInfo`: Gets detailed information about files and directories
+   - `searchFiles`: Searches file contents for patterns and text
+
+5. **AI Tools**
+   - `summarizeText`: Creates concise summaries of longer text
+   - `analyzeSentiment`: Determines sentiment and emotion in text
+   - `extractKeywords`: Extracts key topics and terms from text
+   - `classifyText`: Categorizes text into topics or intents
+   - `translateText`: AI-powered text translation (enhanced version)
+
+6. **System Tools**
+   - `systemInfo`: Provides OS, CPU, memory, and disk information
+   - `processInfo`: Shows details of running processes
+   - `environment`: Works with environment variables
+   - `networkInfo`: Shows network interfaces and connectivity
+   - `executeCommand`: Runs safe system commands with security limits
 
 ### Helper Utilities
 
