@@ -491,10 +491,18 @@ const executionTracker = {
       }
     }
     
-    // Recursive printer
+    // Recursive printer with enhanced formatting
     const printNode = (node: typeof this.toolCalls[0], depth = 0) => {
       const indent = '  '.repeat(depth);
-      console.log(`${indent}${node.name}(${JSON.stringify(node.args)})`);
+      const prefix = depth === 0 ? '📍 ' : depth === 1 ? '├─ ' : '│  '.repeat(depth - 1) + '├─ ';
+      
+      // Simplify args display for cleaner output
+      const argsStr = JSON.stringify(node.args)
+        .replace(/^\{|\}$/g, '')  // Remove outer braces
+        .replace(/"([^"]+)":/g, '$1:')  // Remove quotes around property names
+        .replace(/"/g, "'");  // Convert double quotes to single quotes
+      
+      console.log(`${indent}${prefix}${node.name}(${argsStr})`);
       
       const children = grouped[node.id] || [];
       for (const child of children) {
@@ -525,10 +533,17 @@ async function main() {
   console.log('🤖 Subtasks Example');
   console.log('This example demonstrates how tools can spawn subtasks automatically.\n');
   
-  // Interactive mode - ask for a user ID
-  const readline = require('readline-sync');
+  // Use a default user ID
   console.log('Available user IDs: user123, user456');
-  const userId = readline.question('Enter a user ID to look up (default: user123): ') || 'user123';
+  let userId = 'user123';
+  
+  // Try to use readline-sync if possible, but don't require it
+  try {
+    const readline = require('readline-sync');
+    userId = readline.question('Enter a user ID to look up (default: user123): ') || 'user123';
+  } catch (error) {
+    console.log(`Using default user ID: ${userId}`);
+  }
   
   // Initialize with system message
   const messages: Message[] = [
@@ -567,28 +582,57 @@ async function main() {
               
               // Process subtasks if any
               if (result.subTasks && result.subTasks.length > 0) {
-                // Create a new result with tracked subtasks
-                const trackedSubTasks = result.subTasks.map(subTask => {
+                // Create wrapped functions for each subtask
+                const wrappedSubTasks: SubTask[] = [];
+                
+                for (const subTask of result.subTasks) {
                   const subTool = tools.find(t => t.name === subTask.toolName);
                   if (!subTool) {
                     throw new Error(`SubTask tool '${subTask.toolName}' not found`);
                   }
                   
-                  // Create a tracked version of the subtask
-                  const trackedSubTool = createTrackedTool(subTool, id);
+                  // Create a unique ID for this subtask
+                  const subtaskId = `subtask_${Math.random().toString(36).substring(2, 9)}`;
                   
-                  return {
-                    ...subTask,
-                    originalToolName: subTask.toolName,
-                    toolName: subTask.toolName,
-                    // Replace the tool with our tracked version when it executes
-                    _trackedTool: trackedSubTool
+                  // Create a wrapped version of the subtask function
+                  const wrappedFunc = async (subArgs: any) => {
+                    executionTracker.startToolCall(subtaskId, subTask.toolName, subArgs, id);
+                    try {
+                      const subResult = await subTool.func(subArgs);
+                      if (typeof subResult === 'string') {
+                        executionTracker.endToolCall(subtaskId, subResult);
+                        return { output: subResult };
+                      } else {
+                        executionTracker.endToolCall(subtaskId, subResult.output);
+                        return subResult;
+                      }
+                    } catch (error) {
+                      const errorMsg = error instanceof Error ? error.message : String(error);
+                      executionTracker.endToolCall(subtaskId, `Error: ${errorMsg}`);
+                      throw error;
+                    }
                   };
-                });
+                  
+                  // Replace the original tool with our wrapped version
+                  const wrappedTool: Tool = {
+                    ...subTool,
+                    func: wrappedFunc
+                  };
+                  
+                  // Find the index of this tool in the tools array
+                  const toolIndex = tools.findIndex(t => t.name === subTask.toolName);
+                  if (toolIndex >= 0) {
+                    // Replace the tool in the tools array
+                    tools[toolIndex] = wrappedTool;
+                  }
+                  
+                  // Add the subtask to our list
+                  wrappedSubTasks.push(subTask);
+                }
                 
                 return {
                   ...result,
-                  subTasks: trackedSubTasks
+                  subTasks: wrappedSubTasks
                 };
               }
               
@@ -617,8 +661,17 @@ async function main() {
     
     console.log(`\n🤖 Assistant's final response:\n${response}`);
     
-    // Option to show the execution tree
-    const showTree = readline.keyInYN('\nWould you like to see the execution tree?');
+    // Always show the execution tree in non-interactive mode
+    let showTree = true;
+    
+    // Try to use readline-sync if possible
+    try {
+      const readline = require('readline-sync');
+      showTree = readline.keyInYN('\nWould you like to see the execution tree?');
+    } catch (error) {
+      console.log('\nShowing execution tree:');
+    }
+    
     if (showTree) {
       executionTracker.printExecutionTree();
     }
