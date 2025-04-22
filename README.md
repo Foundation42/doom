@@ -11,7 +11,7 @@ A TypeScript library for running chat sessions with LLM tool-calling models, fea
 - 🔁 Retry logic for transient errors
 - ⏱️ Timeout handling
 - 🛑 Cancellation via AbortSignal
-- 🛠️ Error-resistant JSON parsing
+- 🛠️ Error-resistant JSON parsing with schema validation
 - 📊 Customizable logging
 - 🔍 Parent-child relationship tracking
 
@@ -242,9 +242,9 @@ const result = await runChatWithTools(messages, allTools);
    - `extractData`: Extracts structured data from HTML or text content
 
 2. **Data Tools**
-   - `parseJson`: Validates and formats JSON data
-   - `processCSV`: Handles CSV parsing, transformation, and conversion
-   - `filterData`: Filters, sorts, and aggregates data
+   - `parseJson`: Validates and formats JSON data with comprehensive schema validation
+   - `processCSV`: Handles CSV parsing, transformation, multiple formats (CSV, JSON, ASCII tables), filtering and cell transformations
+   - `filterData`: Filters, sorts, and aggregates data with complex filtering criteria
    - `generateChart`: Creates data visualizations (simulated)
 
 3. **Utility Tools**
