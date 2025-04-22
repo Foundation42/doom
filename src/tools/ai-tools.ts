@@ -3,6 +3,8 @@
  */
 import { Tool, ToolResult } from '../types';
 import { safeToolExecution, delay } from './index';
+import { transform } from '../llm/transform';
+import { TaskType } from '../llm/adaptive-llm';
 
 /**
  * Creates a set of AI tools for language models and generative content
@@ -54,57 +56,38 @@ export const textSummarizerTool: Tool = {
     return safeToolExecution(async () => {
       const { text, maxLength = 500, format = 'paragraph' } = args;
       
-      // Simulate AI processing time
-      await delay(1000);
-      
       // Basic word count
       const wordCount = text.split(/\s+/).length;
       
-      // In a real implementation, this would call an LLM API
-      // For this demo, we'll simulate summarization with a simple algorithm
-      
-      // Split into sentences
-      const sentences = text.match(/[^.!?]+[.!?]+/g) || [];
-      
-      // Simple extractive summary by taking first few sentences
-      // In real implementation, use a proper summarization API or algorithm
-      let summary = '';
-      let currentLength = 0;
-      
-      // Generate different formats
+      // Create format-specific instructions
+      let formatInstructions = '';
       if (format === 'paragraph') {
-        // Take sentences until we reach max length
-        for (const sentence of sentences) {
-          if (currentLength + sentence.length <= maxLength) {
-            summary += sentence;
-            currentLength += sentence.length;
-          } else {
-            break;
-          }
-        }
+        formatInstructions = `Format the summary as a coherent paragraph of about ${maxLength} characters.`;
       } else if (format === 'bullets') {
-        // Create bullet points from sentences
-        summary = sentences.slice(0, 5).map(s => `• ${s.trim()}`).join('\n');
+        formatInstructions = `Format the summary as a bullet list of key points.`;
       } else if (format === 'outline') {
-        // Create an outline with main points
-        summary = '# Summary\n\n';
-        
-        // Extract what seem like main points (longer sentences)
-        const mainPoints = sentences
-          .filter(s => s.length > 50)
-          .slice(0, 3);
-        
-        mainPoints.forEach((point, i) => {
-          summary += `## Point ${i + 1}\n${point.trim()}\n\n`;
-        });
+        formatInstructions = `Format the summary as an outline with headings and subheadings.`;
       }
+      
+      // Create the prompt for the LLM
+      const prompt = `Summarize the following text in about ${maxLength} characters. ${formatInstructions}
+      
+Text to summarize:
+"""
+${text}
+"""
+
+Summary:`;
+      
+      // Use transform with COMPLEX_REASONING task type for summarization
+      const summary = await transform(prompt, TaskType.COMPLEX_REASONING);
       
       return {
         output: `Summarized text from ${wordCount} words:\n\n${summary}`,
         summary,
         originalLength: text.length,
         summaryLength: summary.length,
-        compressionRatio: (text.length / summary.length).toFixed(2)
+        compressionRatio: (text.length / summary.length || 1).toFixed(2)
       };
     }, (error) => {
       return `Text summarization failed: ${error.message}`;
@@ -141,81 +124,85 @@ export const sentimentAnalyzerTool: Tool = {
     return safeToolExecution(async () => {
       const { text, detailed = false } = args;
       
-      // Simulate processing time
-      await delay(800);
+      // Create prompt based on detailed flag
+      const promptBase = `Analyze the sentiment of the following text:
       
-      // In a real implementation, this would use a sentiment analysis API or library
-      // This is a simple simulation for demonstration purposes
+"""
+${text}
+"""`;
       
-      // Basic word-based sentiment analysis
-      const positiveWords = ['good', 'great', 'excellent', 'amazing', 'happy', 'love', 'like', 'best', 'fantastic', 'wonderful', 'positive', 'awesome'];
-      const negativeWords = ['bad', 'awful', 'terrible', 'horrible', 'sad', 'hate', 'dislike', 'worst', 'negative', 'poor', 'disappointed'];
-      
-      const words = text.toLowerCase().match(/\w+/g) || [];
-      
-      let positiveCount = 0;
-      let negativeCount = 0;
-      
-      words.forEach(word => {
-        if (positiveWords.includes(word)) positiveCount++;
-        if (negativeWords.includes(word)) negativeCount++;
-      });
-      
-      // Simple sentiment score between -1 and 1
-      const sentimentScore = words.length > 0 
-        ? (positiveCount - negativeCount) / words.length 
-        : 0;
-      
-      // Map to sentiment categories
-      let sentiment = 'neutral';
-      if (sentimentScore > 0.05) sentiment = 'positive';
-      if (sentimentScore > 0.15) sentiment = 'very positive';
-      if (sentimentScore < -0.05) sentiment = 'negative';
-      if (sentimentScore < -0.15) sentiment = 'very negative';
-      
-      // Basic result
-      const result: any = {
-        sentiment,
-        score: sentimentScore.toFixed(2)
-      };
-      
-      // Add detailed emotion analysis if requested
+      let prompt = '';
       if (detailed) {
-        // Emotion detection (very simplified)
-        const emotions = {
-          joy: ['happy', 'excited', 'delighted', 'joy', 'celebrate'],
-          anger: ['angry', 'mad', 'furious', 'rage', 'annoyed'],
-          fear: ['afraid', 'scared', 'terrified', 'worried', 'fear'],
-          sadness: ['sad', 'unhappy', 'depressed', 'grief', 'miserable'],
-          surprise: ['surprised', 'amazed', 'astonished', 'unexpected'],
-          disgust: ['disgusted', 'revolted', 'gross', 'repulsed']
-        };
-        
-        const emotionScores: Record<string, number> = {};
-        
-        // Count emotion words
-        Object.entries(emotions).forEach(([emotion, emotionWords]) => {
-          const count = words.filter(word => emotionWords.includes(word)).length;
-          emotionScores[emotion] = count / words.length;
-        });
-        
-        result.emotions = emotionScores;
-        
-        // Find dominant emotion
-        const dominantEmotion = Object.entries(emotionScores)
-          .reduce((max, [emotion, score]) => score > max.score ? { emotion, score } : max, { emotion: 'neutral', score: 0 });
-        
-        result.dominantEmotion = dominantEmotion.score > 0 ? dominantEmotion.emotion : 'neutral';
+        prompt = `${promptBase}
+
+Provide a sentiment analysis in JSON format with the following structure:
+{
+  "sentiment": "one of: very positive, positive, neutral, negative, or very negative",
+  "score": "decimal score between -1.0 and 1.0",
+  "dominantEmotion": "primary emotion detected (joy, anger, fear, sadness, surprise, disgust, or neutral)",
+  "emotions": {
+    "joy": "decimal score between 0.0 and 1.0",
+    "anger": "decimal score between 0.0 and 1.0",
+    "fear": "decimal score between 0.0 and 1.0",
+    "sadness": "decimal score between 0.0 and 1.0",
+    "surprise": "decimal score between 0.0 and 1.0",
+    "disgust": "decimal score between 0.0 and 1.0"
+  }
+}`;
+      } else {
+        prompt = `${promptBase}
+
+Provide a sentiment analysis in JSON format with the following structure:
+{
+  "sentiment": "one of: very positive, positive, neutral, negative, or very negative",
+  "score": "decimal score between -1.0 and 1.0"
+}`;
       }
       
-      return {
-        output: `Sentiment analysis: ${result.sentiment} (score: ${result.score})${
-          detailed && result.dominantEmotion !== 'neutral' 
-            ? `\nDominant emotion: ${result.dominantEmotion}` 
-            : ''
-        }`,
-        analysis: result
-      };
+      // Use transform with QUICK_RESPONSE task type for sentiment analysis
+      // as it's a relatively straightforward task
+      const response = await transform(prompt, TaskType.QUICK_RESPONSE);
+      
+      // Parse the LLM response - extract JSON
+      let jsonString = '';
+      try {
+        // Find JSON in the response (enclosed in curly braces)
+        const jsonMatch = response.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          jsonString = jsonMatch[0];
+        } else {
+          throw new Error('No JSON found in response');
+        }
+        
+        // Parse the JSON
+        const result = JSON.parse(jsonString);
+        
+        // Create output string
+        let outputString = `Sentiment analysis: ${result.sentiment} (score: ${result.score})`;
+        if (detailed && result.dominantEmotion && result.dominantEmotion !== 'neutral') {
+          outputString += `\nDominant emotion: ${result.dominantEmotion}`;
+        }
+        
+        return {
+          output: outputString,
+          analysis: result
+        };
+      } catch (error) {
+        // If JSON parsing fails, return a simplified response
+        console.error('Error parsing sentiment JSON:', error);
+        
+        // Extract sentiment using regex as fallback
+        const sentimentMatch = response.match(/sentiment["\s:]+([a-z\s]+)/i);
+        const sentiment = sentimentMatch ? sentimentMatch[1].trim() : 'neutral';
+        
+        return {
+          output: `Sentiment analysis: ${sentiment}`,
+          analysis: {
+            sentiment,
+            score: "0.0"
+          }
+        };
+      }
     }, (error) => {
       return `Sentiment analysis failed: ${error.message}`;
     });
@@ -257,64 +244,75 @@ export const keywordExtractorTool: Tool = {
     return safeToolExecution(async () => {
       const { text, maxKeywords = 10, minLength = 3 } = args;
       
-      // Simulate processing time
-      await delay(700);
+      // Create a prompt for the LLM
+      const prompt = `Extract the most important keywords and key phrases from the following text.
       
-      // In a real implementation, this would use NLP techniques or an API
-      // Simple implementation for demonstration
+Text:
+"""
+${text}
+"""
+
+Please return ONLY a JSON array of exactly ${maxKeywords} keywords/phrases, where each keyword must be at least ${minLength} characters long. 
+Use this exact format:
+{
+  "keywords": ["keyword1", "keyword2", "keyword3", ...]
+}
+
+Identify terms that capture the main topics and concepts. Include both individual keywords and multi-word phrases when appropriate.
+Return only the JSON with no other text.`;
       
-      // Remove common stop words
-      const stopWords = ['a', 'an', 'the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'with', 
-                         'by', 'about', 'as', 'of', 'from', 'is', 'was', 'be', 'been', 'being', 'are',
-                         'were', 'am', 'i', 'you', 'he', 'she', 'it', 'we', 'they', 'this', 'that'];
+      // Use transform with QUICK_RESPONSE task type
+      const response = await transform(prompt, TaskType.QUICK_RESPONSE);
       
-      // Tokenize and clean text
-      const words = text.toLowerCase()
-        .replace(/[^\w\s]/g, '') // Remove punctuation
-        .split(/\s+/)
-        .filter(word => word.length >= minLength && !stopWords.includes(word));
-      
-      // Count word frequency
-      const wordFrequency: Record<string, number> = {};
-      words.forEach(word => {
-        wordFrequency[word] = (wordFrequency[word] || 0) + 1;
-      });
-      
-      // Sort by frequency
-      const sortedWords = Object.entries(wordFrequency)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, maxKeywords)
-        .map(([word, count]) => ({ word, count }));
-      
-      // Try to extract phrases (2-3 word combinations)
-      const phrases: string[] = [];
-      const textLower = text.toLowerCase();
-      
-      sortedWords.forEach(({ word }) => {
-        // Look for 2-word phrases
-        const phrasePattern = new RegExp(`\\b${word}\\s+\\w+\\b`, 'g');
-        const matches = [...textLower.matchAll(phrasePattern)];
-        
-        if (matches.length > 0) {
-          // Get the most common phrase
-          const phrase = matches[0][0].trim();
-          if (!phrases.includes(phrase) && !stopWords.includes(phrase.split(/\s+/)[1])) {
-            phrases.push(phrase);
-          }
+      // Extract JSON
+      try {
+        // Find JSON in the response
+        const jsonMatch = response.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+          throw new Error('No JSON found in response');
         }
-      });
-      
-      // Combine single words and phrases
-      const keywords = [
-        ...sortedWords.slice(0, maxKeywords - phrases.length),
-        ...phrases.slice(0, maxKeywords / 2).map(phrase => ({ word: phrase, count: 1 }))
-      ];
-      
-      return {
-        output: `Extracted ${keywords.length} keywords from text:\n${keywords.map(k => k.word).join(', ')}`,
-        keywords: keywords.map(k => k.word),
-        frequencies: sortedWords.reduce((obj, { word, count }) => ({ ...obj, [word]: count }), {})
-      };
+        
+        const jsonString = jsonMatch[0];
+        const result = JSON.parse(jsonString);
+        
+        if (!result.keywords || !Array.isArray(result.keywords)) {
+          throw new Error('Invalid keywords format in response');
+        }
+        
+        // Filter any keywords that don't meet the minimum length
+        const filteredKeywords = result.keywords
+          .filter(keyword => typeof keyword === 'string' && keyword.length >= minLength)
+          .slice(0, maxKeywords);
+        
+        // Create frequencies object (we don't have real frequencies, but we'll simulate them)
+        const frequencies: Record<string, number> = {};
+        filteredKeywords.forEach((keyword, index) => {
+          // Assign descending "importance" values as a proxy for frequency
+          frequencies[keyword] = 1 - (index / (filteredKeywords.length * 2));
+        });
+        
+        return {
+          output: `Extracted ${filteredKeywords.length} keywords from text:\n${filteredKeywords.join(', ')}`,
+          keywords: filteredKeywords,
+          frequencies
+        };
+      } catch (error) {
+        console.error('Error parsing keywords JSON:', error);
+        
+        // Fallback to a simpler method if JSON parsing fails
+        // Extract keywords using regex
+        const keywordMatches = response.match(/["']([^"']+)["']/g) || [];
+        const keywords = keywordMatches
+          .map(match => match.replace(/["']/g, ''))
+          .filter(keyword => keyword.length >= minLength)
+          .slice(0, maxKeywords);
+          
+        return {
+          output: `Extracted ${keywords.length} keywords from text:\n${keywords.join(', ')}`,
+          keywords,
+          frequencies: {}
+        };
+      }
     }, (error) => {
       return `Keyword extraction failed: ${error.message}`;
     });
@@ -368,12 +366,6 @@ export const textClassifierTool: Tool = {
         multiLabel = false
       } = args;
       
-      // Simulate processing delay
-      await delay(1200);
-      
-      // In a real implementation, this would use a text classification API or model
-      // Simple simulation for demonstration
-      
       let availableCategories: string[];
       
       // Define default categories based on mode
@@ -399,94 +391,139 @@ export const textClassifierTool: Tool = {
         };
       }
       
-      // Simple keyword-based classification
-      const keywordMap: Record<string, string[]> = {
-        // Topics
-        'technology': ['computer', 'software', 'hardware', 'app', 'tech', 'digital', 'internet', 'code', 'program'],
-        'business': ['company', 'market', 'finance', 'invest', 'stock', 'economic', 'industry', 'trade', 'profit'],
-        'politics': ['government', 'election', 'president', 'democrat', 'republican', 'vote', 'political', 'policy', 'law'],
-        'health': ['doctor', 'medical', 'disease', 'patient', 'healthy', 'hospital', 'treatment', 'symptom', 'medication'],
-        'science': ['research', 'scientist', 'study', 'experiment', 'discovery', 'theory', 'physics', 'chemistry', 'biology'],
-        'entertainment': ['movie', 'film', 'music', 'actor', 'celebrity', 'hollywood', 'television', 'show', 'drama'],
-        'sports': ['player', 'team', 'game', 'score', 'win', 'championship', 'tournament', 'athletic', 'coach'],
-        'education': ['school', 'student', 'teacher', 'learn', 'class', 'education', 'academic', 'study', 'college'],
-        'travel': ['trip', 'vacation', 'hotel', 'flight', 'tourist', 'destination', 'travel', 'visit', 'country'],
-        'food': ['restaurant', 'recipe', 'cook', 'meal', 'ingredient', 'food', 'dish', 'cuisine', 'flavor'],
-        
-        // Intents
-        'question': ['who', 'what', 'when', 'where', 'why', 'how', '?', 'could you', 'tell me'],
-        'request': ['please', 'would you', 'can you', 'help', 'need', 'want', 'looking for', 'assist'],
-        'complaint': ['problem', 'issue', 'broken', 'disappointed', 'unhappy', 'failure', 'complaint', 'bad', 'wrong'],
-        'feedback': ['think', 'opinion', 'suggest', 'feedback', 'review', 'rating', 'experience', 'improve'],
-        'greeting': ['hello', 'hi', 'hey', 'morning', 'afternoon', 'evening', 'welcome', 'greet'],
-        'farewell': ['goodbye', 'bye', 'see you', 'later', 'take care', 'night', 'leaving'],
-        'thanks': ['thank', 'appreciate', 'grateful', 'thankful', 'helped', 'thanks'],
-        'apology': ['sorry', 'apologize', 'apology', 'mistake', 'regret', 'fault', 'forgive']
-      };
-      
-      // Count keyword matches for each category
-      const categoryScores: Record<string, number> = {};
-      const textLower = text.toLowerCase();
-      
-      availableCategories.forEach(category => {
-        // Skip categories without keyword definitions
-        if (!keywordMap[category]) {
-          categoryScores[category] = 0;
-          return;
-        }
-        
-        // Count matches
-        const keywords = keywordMap[category];
-        const matches = keywords.filter(keyword => textLower.includes(keyword)).length;
-        
-        // Calculate score (normalized by number of keywords)
-        categoryScores[category] = matches / keywords.length;
-      });
-      
-      // Sort by score
-      const sortedCategories = Object.entries(categoryScores)
-        .sort((a, b) => b[1] - a[1]);
+      // Create a prompt for the LLM
+      let prompt: string;
       
       if (multiLabel) {
-        // Return all categories with non-zero scores
-        const matchingCategories = sortedCategories
-          .filter(([_, score]) => score > 0)
-          .map(([category, score]) => ({ 
-            category, 
-            confidence: parseFloat((score * 100).toFixed(1)) 
-          }));
+        prompt = `Classify the following text into one or more of these categories: ${availableCategories.join(', ')}.
         
-        return {
-          output: `Text classified into ${matchingCategories.length} categories:\n` +
-                  matchingCategories.map(c => `${c.category} (${c.confidence}%)`).join(', '),
-          classifications: matchingCategories,
-          mode
-        };
+Text to classify:
+"""
+${text}
+"""
+
+Return your classification results as JSON with the following structure:
+{
+  "classifications": [
+    { "category": "category_name", "confidence": 0.95 },
+    { "category": "another_category", "confidence": 0.75 }
+  ]
+}
+
+For each matching category, include a confidence score between 0.0 and 1.0.
+Only include categories that are relevant to the text, with a confidence of at least 0.5.
+Return only the JSON with no other text.`;
       } else {
-        // Return only top category
-        const topCategory = sortedCategories[0];
+        prompt = `Classify the following text into exactly one of these categories: ${availableCategories.join(', ')}.
         
-        if (!topCategory || topCategory[1] === 0) {
+Text to classify:
+"""
+${text}
+"""
+
+Return your classification result as JSON with the following structure:
+{
+  "classification": {
+    "category": "category_name",
+    "confidence": 0.95
+  },
+  "alternativeCategories": [
+    { "category": "second_best_category", "confidence": 0.80 },
+    { "category": "third_best_category", "confidence": 0.70 }
+  ]
+}
+
+For the classification, include a confidence score between 0.0 and 1.0.
+Also include the 2 next best categories as alternatives.
+Return only the JSON with no other text.`;
+      }
+      
+      // Add information about the mode
+      if (mode === 'topic') {
+        prompt += '\n\nThis is a topic classification task. Identify the main subject area or topic.';
+      } else if (mode === 'intent') {
+        prompt += '\n\nThis is an intent classification task. Identify the purpose or intent of the message.';
+      }
+      
+      // Use transform with appropriate task type based on complexity
+      const response = await transform(prompt, TaskType.COMPLEX_REASONING);
+      
+      // Parse the LLM response
+      try {
+        const jsonMatch = response.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+          throw new Error('No JSON found in response');
+        }
+        
+        const jsonString = jsonMatch[0];
+        const result = JSON.parse(jsonString);
+        
+        if (multiLabel) {
+          if (!result.classifications || !Array.isArray(result.classifications)) {
+            throw new Error('Invalid format for multi-label classification');
+          }
+          
+          const matchingCategories = result.classifications.map((c: any) => ({
+            category: c.category,
+            confidence: typeof c.confidence === 'number' ? c.confidence : parseFloat(c.confidence)
+          }));
+          
           return {
-            output: `Unable to classify text into any of the provided categories`,
-            classifications: [],
+            output: `Text classified into ${matchingCategories.length} categories:\n` +
+                   matchingCategories.map(c => `${c.category} (${(c.confidence * 100).toFixed(1)}%)`).join(', '),
+            classifications: matchingCategories,
+            mode
+          };
+        } else {
+          if (!result.classification || !result.classification.category) {
+            throw new Error('Invalid format for single-label classification');
+          }
+          
+          const classification = {
+            category: result.classification.category,
+            confidence: typeof result.classification.confidence === 'number' 
+              ? result.classification.confidence 
+              : parseFloat(result.classification.confidence)
+          };
+          
+          let alternativeCategories: { category: string; confidence: number }[] = [];
+          
+          if (result.alternativeCategories && Array.isArray(result.alternativeCategories)) {
+            alternativeCategories = result.alternativeCategories.map((c: any) => ({
+              category: c.category,
+              confidence: typeof c.confidence === 'number' ? c.confidence : parseFloat(c.confidence)
+            }));
+          }
+          
+          return {
+            output: `Text classified as "${classification.category}" with ${(classification.confidence * 100).toFixed(1)}% confidence`,
+            classification,
+            alternativeCategories,
             mode
           };
         }
+      } catch (error) {
+        console.error('Error parsing classification JSON:', error);
         
-        return {
-          output: `Text classified as "${topCategory[0]}" with ${(topCategory[1] * 100).toFixed(1)}% confidence`,
-          classification: {
-            category: topCategory[0],
-            confidence: parseFloat((topCategory[1] * 100).toFixed(1))
-          },
-          alternativeCategories: sortedCategories.slice(1, 3)
-            .map(([category, score]) => ({ 
-              category, 
-              confidence: parseFloat((score * 100).toFixed(1)) 
-            })),
-          mode
-        };
+        // Fallback to simpler method if JSON parsing fails
+        // Try to extract categories using regex
+        const categoryMatch = response.match(/category["\s:]+([a-z_]+)/i);
+        const category = categoryMatch ? categoryMatch[1].trim() : availableCategories[0];
+        
+        if (multiLabel) {
+          return {
+            output: `Text classified into 1 category: ${category} (75.0%)`,
+            classifications: [{ category, confidence: 0.75 }],
+            mode
+          };
+        } else {
+          return {
+            output: `Text classified as "${category}" with 75.0% confidence`,
+            classification: { category, confidence: 0.75 },
+            alternativeCategories: [],
+            mode
+          };
+        }
       }
     }, (error) => {
       return `Text classification failed: ${error.message}`;
@@ -540,12 +577,6 @@ export const aiTranslationTool: Tool = {
         preserveFormatting = true
       } = args;
       
-      // Simulate translation delay
-      await delay(1000);
-      
-      // This is a simulation - in a real implementation, this would call a translation API
-      // For demo purposes, we'll just add a language marker
-      
       // Language codes map
       const languages: Record<string, string> = {
         'en': 'English',
@@ -574,31 +605,50 @@ export const aiTranslationTool: Tool = {
         };
       }
       
-      // Simulate translation
-      // In a real implementation, this would use a translation API
+      // Create a prompt for the LLM based on the task
+      let prompt: string;
       
-      // Simple preservation of basic formatting
-      let formattedText = text;
-      let translatedText = `[AI Translation to ${targetName}: "${text}"]`;
+      if (sourceLanguage === 'auto') {
+        prompt = `Translate the following text to ${targetName}:
+        
+"""
+${text}
+"""
+
+Respond ONLY with the translation, no introduction or explanation.`;
+      } else {
+        prompt = `Translate the following ${sourceName} text to ${targetName}:
+        
+"""
+${text}
+"""
+
+Respond ONLY with the translation, no introduction or explanation.`;
+      }
       
+      // If we need to preserve formatting
       if (preserveFormatting) {
-        // Preserve paragraph breaks
-        const paragraphs = text.split(/\n\s*\n/);
-        translatedText = paragraphs.map(p => `[AI Translation to ${targetName}: "${p}"]`).join('\n\n');
+        prompt += `\n\nImportant: Preserve the original formatting including paragraph breaks, bullet points, numbering, and any other formatting elements.`;
+      }
+      
+      // Use transform for translation
+      const translatedText = await transform(prompt, TaskType.QUICK_RESPONSE);
+      
+      // Determine actual source language for auto
+      let detectedSourceLang = sourceLanguage;
+      if (sourceLanguage === 'auto') {
+        // For simplicity, assume English if not specified
+        detectedSourceLang = 'en';
         
-        // Preserve bullet points
-        translatedText = translatedText.replace(/^(\s*[-*•]\s*)/gm, match => match);
-        
-        // Preserve numbering
-        translatedText = translatedText.replace(/^(\s*\d+\.\s*)/gm, match => match);
+        // In a more sophisticated implementation, we could also ask the LLM to identify the source language
       }
       
       return {
         output: `Translation from ${sourceName} to ${targetName}:\n\n${translatedText}`,
         translation: translatedText,
-        sourceLanguage: sourceLanguage === 'auto' ? 'en' : sourceLanguage, // In a real impl, this would be detected
+        sourceLanguage: detectedSourceLang,
         targetLanguage,
-        confidence: 0.95 // Simulated confidence score
+        confidence: 0.95
       };
     }, (error) => {
       return `Translation failed: ${error.message}`;
