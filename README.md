@@ -1,6 +1,40 @@
-# ChatRunner
+# 🔥 DOOM (v1.0)
+
+**The AI agent that *doesn't* ruin everything.**
 
 A TypeScript library for running chat sessions with LLM tool-calling models, featuring support for automatic subtasks, parallel execution, and a rich set of built-in tools.
+
+![DOOM Banner](https://placehold.co/800x200/c00/ff3/text=DOOM:+The+AI+agent+that+doesn't+ruin+everything)
+
+## Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/Foundation42/doom.git
+cd doom
+
+# Install dependencies
+npm install
+
+# Build the project
+npm run build
+
+# Install globally (optional)
+npm link
+```
+
+## Quick Start
+
+```bash
+# Start the interactive DOOM experience
+doom
+
+# Or run a single command
+doom "What's the weather in Tokyo?"
+
+# Use parallel execution for faster results
+doom --parallel "Compare the weather in London, New York and Tokyo"
+```
 
 ## Features
 
@@ -27,7 +61,7 @@ pnpm install
 
 ## Running the Examples
 
-The repository includes several examples to demonstrate the chatrunner features:
+The repository includes several examples to demonstrate DOOM's capabilities:
 
 ```bash
 # Build the project
@@ -74,7 +108,7 @@ For the advanced AI tools demo, at least the OpenAI API key is required. Additio
 ## Basic Usage
 
 ```typescript
-import { runChatWithTools } from 'chatrunner';
+import { runChatWithTools } from 'doom';
 
 // Define a tool
 const weatherTool = {
@@ -105,7 +139,7 @@ console.log(result);
 
 ## Subtasks
 
-The most powerful feature of ChatRunner is the ability to have tools automatically trigger other tools by returning subtasks:
+The most powerful feature of DOOM is the ability to have tools automatically trigger other tools by returning subtasks:
 
 ```typescript
 const getUserProfileTool = {
@@ -167,10 +201,10 @@ The `maxConcurrent` setting helps control resource usage by limiting how many ta
 
 ## Custom Logging
 
-ChatRunner supports custom loggers for better integration with your application's logging system:
+DOOM supports custom loggers for better integration with your application's logging system:
 
 ```typescript
-import { createConsoleLogger } from 'chatrunner';
+import { createConsoleLogger } from 'doom';
 
 // Create a custom logger
 const myLogger = {
@@ -211,10 +245,10 @@ const result = await runChatWithTools(messages, tools, options);
 
 ## Standard Tools Library
 
-ChatRunner includes a standard library of reusable tools that you can include in your projects:
+DOOM includes a standard library of reusable tools that you can include in your projects:
 
 ```typescript
-import { createStandardTools } from 'chatrunner';
+import { createStandardTools } from 'doom';
 
 // Get the entire standard tool library
 const allTools = createStandardTools();
@@ -224,7 +258,7 @@ import {
   createHttpTools, 
   createDataTools, 
   createUtilityTools 
-} from 'chatrunner/tools';
+} from 'doom/tools';
 
 const httpTools = createHttpTools();
 const dataTools = createDataTools();
@@ -292,7 +326,7 @@ const result = await runChatWithTools(messages, allTools);
 The tools library also includes useful helper functions:
 
 ```typescript
-import { safeToolExecution, delay } from 'chatrunner';
+import { safeToolExecution, delay } from 'doom';
 
 // Safely execute a function with error handling
 const result = await safeToolExecution(

@@ -1,22 +1,121 @@
+// DOOM CLI entry point - bundled version
+import path from 'path';
+import readline from 'readline-sync';
+import chalk from 'chalk';
+import fs from 'fs';
+import * as os from 'os';
+import { runChatWithTools, createConsoleLogger, createStandardTools } from '../src';
+import { speakTextTool } from '../src/tools/tts-tools';
+import { Message, Tool } from '../src/types';
+
+// Current version
+const VERSION = '1.0.0';
+
+// DOOM logo
+const LOGO = `  _____    ____    ____    __  __ 
+ |  __ \  / __ \  / __ \  |  \/  |
+ | |  | || |  | || |  | | | \  / |
+ | |  | || |  | || |  | | | |\/| |
+ | |__| || |__| || |__| | | |  | |
+ |_____/  \____/  \____/  |_|  |_|
+                                  
+ The AI agent that *doesn't* ruin everything.`;
+
 /**
- * Enhanced REPL for ChatRunner with standard library tools and improved UI
+ * Display the DOOM logo
+ */
+function displayLogo() {
+  console.log(chalk.red(LOGO));
+}
+
+/**
+ * Main CLI function
+ */
+async function main() {
+  // Parse arguments
+  const args = process.argv.slice(2);
+  
+  // Handle help flag
+  if (args.includes('--help') || args.includes('-h')) {
+    displayLogo();
+    console.log(`The AI agent that *doesn't* ruin everything.
+
+Usage:
+  doom [options] [command]    Run a command or start interactive mode
+
+Options:
+  --help, -h                  Show this help message
+  --version, -v               Show version information
+  --parallel                  Enable parallel execution
+  
+Commands:
+  (none)                      Start interactive REPL
+  "your command here"         Run a single command and exit
+
+Examples:
+  doom                        Start interactive REPL
+  doom "What's the weather in Tokyo?"
+  doom --parallel "Compare weather in London and New York"
+  
+For more details visit: https://github.com/Foundation42/doom`);
+    process.exit(0);
+  }
+
+  // Handle version flag
+  if (args.includes('--version') || args.includes('-v')) {
+    displayLogo();
+    console.log("DOOM CLI Version: " + VERSION);
+    process.exit(0);
+  }
+
+  // Extract command and parallel flag
+  let command = null;
+  let parallelExecution = false;
+
+  // Check for parallel flag
+  if (args.includes('--parallel')) {
+    parallelExecution = true;
+    // Remove the parallel flag from args for command processing
+    const parallelIndex = args.indexOf('--parallel');
+    args.splice(parallelIndex, 1);
+  }
+
+  // Treat all remaining args as the command
+  if (args.length > 0) {
+    command = args.join(' ');
+  }
+
+  // Now run either single command or interactive REPL
+  if (command) {
+    await runSingleCommand(command, parallelExecution);
+  } else {
+    await runInteractiveMode(parallelExecution);
+  }
+}
+
+// Import the entire doom.ts file content
+/**
+ * DOOM - The AI agent that *doesn't* ruin everything.
  * 
  * Usage:
- *   npm run repl                    - Start interactive REPL
- *   npm run repl -- --cmd "command" - Run a single command and exit
+ *   npm run doom                    - Start interactive DOOM
+ *   npm run doom -- --cmd "command" - Run a single command and exit
+ *   doom                            - Use CLI binary directly
+ *   doom "command"                  - Run command with CLI binary
  */
-import * as readline from 'readline-sync';
-import { 
+// Import statement removed
+// Import statement removed
   runChatWithTools, 
   createConsoleLogger,
-  createStandardTools
-} from '../src';
-import { Message, Tool } from '../src/types';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
+  createStandardTools,
+  speakTextTool
+// Import statement removed
+// Import statement removed
+// Import statement removed
+// Import statement removed
+// Import statement removed
 // Use CommonJS version of chalk (v4) for compatibility
-import chalk from 'chalk';
+// Import statement removed
 
 // Banner for the REPL
 const banner = `
@@ -152,26 +251,27 @@ function listTools(tools: Tool[]) {
  * Displays help information for the REPL
  */
 function showHelp() {
-  console.log(chalk.cyan.bold('\n🔍 REPL Commands:'));
+  console.log(chalk.redBright.bold('\n🔥 DOOM Commands:'));
   console.log(`
-  ${chalk.yellow('exit')}          - Exit the REPL
+  ${chalk.yellow('exit')}          - Exit DOOM (if you dare)
   ${chalk.yellow('help')}          - Show this help message
-  ${chalk.yellow('tools')}         - List all available tools
+  ${chalk.yellow('tools')}         - List all available weapons
   ${chalk.yellow('clear')}         - Clear the conversation history
   ${chalk.yellow('parallel on')}   - Enable parallel tool execution
   ${chalk.yellow('parallel off')}  - Disable parallel tool execution
   
-${chalk.cyan.bold('💡 Tips:')}
-  - Ask questions naturally and the assistant will use tools appropriately
+${chalk.redBright.bold('💡 Tips:')}
+  - Ask questions naturally and DOOM will use weapons appropriately
   - For AI and LLM tools, provide sufficient text to analyze
   - Some tools like TTS and LLM tools require API keys in your environment
+  - DOOM never ruins things (that's the whole point)
   
-${chalk.cyan.bold('📋 Examples:')}
+${chalk.redBright.bold('📋 Examples:')}
   - "What's the weather in Tokyo?"
   - "Calculate a 18% tip on a $45.50 bill"
   - "Summarize this article: [paste text here]"
   - "Translate this to Spanish: Hello, how are you?"
-  - "Who are you and what tools can you use?"
+  - "Who are you and what weapons do you have?"
   `);
 }
 
@@ -184,6 +284,25 @@ function createTools() {
   const standardTools = createStandardTools();
   
   // Add custom tools with familiar examples
+  // Add a customized version of the speakTextTool with a special doom intro
+  const doomSpeakTool = {
+    ...speakTextTool,
+    func: async (args: any) => {
+      if (!process.env.OPENAI_API_KEY) {
+        return { output: "Error: OpenAI API key required for TTS" };
+      }
+      // If this is the first time using TTS in this session, play an intro
+      if (!(global as any).doomTtsInitialized) {
+        await speakTextTool.func({
+          text: "DOOM activated. All systems operational.",
+          voice: "nova"
+        });
+        (global as any).doomTtsInitialized = true;
+      }
+      return speakTextTool.func(args);
+    }
+  };
+
   const customTools: Tool[] = [
     {
       name: 'get_weather',
@@ -255,7 +374,7 @@ function createTools() {
   ];
   
   // Combine all tools
-  const allTools = [...standardTools, ...customTools];
+  const allTools = [...standardTools, ...customTools, doomSpeakTool];
   
   return {
     standardTools,
@@ -278,21 +397,21 @@ Keep responses focused and concise.`;
 /**
  * Run the interactive REPL
  */
-async function main() {
+async function runInteractiveMode(parallelExecution = false) {
   console.log(banner);
   console.log(`${chalk.yellow('Welcome to the enhanced ChatRunner REPL with standard library tools.')}`);
   
   // Initialize with parallel flag
-  let parallelExecution = false;
+  // Parallel execution flag is now passed as parameter
   
   // Set up tools
   const { standardTools, customTools, allTools } = createTools();
   
   // Display tool count
-  console.log(chalk.green(`\n🛠️  Loaded ${allTools.length} tools (${standardTools.length} standard + ${customTools.length} custom)`));
+  console.log(chalk.redBright(`\n🔥 Armed with ${allTools.length} tools (${standardTools.length} standard + ${customTools.length} custom)`));
   
   // Display command help
-  console.log(chalk.gray('\nType "tools" to see available tools, "help" for commands, or "exit" to quit.'));
+  console.log(chalk.gray('\nType "tools" to see available weapons, "help" for commands, or "exit" to quit.'));
   
   // Initialize with system message
   let messages: Message[] = [
@@ -305,7 +424,7 @@ async function main() {
   // REPL loop
   while (true) {
     // Get user input with styled prompt
-    const userInput = readline.question(`\n${chalk.green.bold('You:')} `);
+    const userInput = readline.question(`\n${chalk.redBright.bold('DOOM:')} `);
     
     // Check for REPL commands
     if (userInput.toLowerCase() === 'exit') {
@@ -338,7 +457,7 @@ async function main() {
     });
 
     try {
-      console.log(`\n${chalk.blue('Assistant:')} ${chalk.gray('Thinking...')}`);
+      console.log(`\n${chalk.yellow('Thinking...')} ${chalk.gray('(DOOM does not ruin things while thinking)')}`);
 
       // Create AbortController for timeout
       const controller = new AbortController();
@@ -357,7 +476,7 @@ async function main() {
       clearTimeout(timeoutId);
 
       // Print response with formatting
-      console.log(`\n${chalk.blue.bold('Assistant:')} ${response}`);
+      console.log(`\n${chalk.red.bold('DOOM:')} ${response}`);
 
       // Add assistant response to history
       messages.push({
@@ -395,8 +514,8 @@ async function runSingleCommand(command: string, useParallel: boolean = false) {
   ];
 
   try {
-    console.log(`${chalk.green.bold('Command:')} ${command}`);
-    console.log(`${chalk.blue('Assistant:')} ${chalk.gray('Thinking...')}`);
+    console.log(`${chalk.redBright.bold('Command:')} ${command}`);
+    console.log(`${chalk.yellow('Thinking...')} ${chalk.gray('(DOOM does not ruin things while thinking)')}`);
 
     // Create AbortController for timeout
     const controller = new AbortController();
@@ -415,7 +534,7 @@ async function runSingleCommand(command: string, useParallel: boolean = false) {
     clearTimeout(timeoutId);
 
     // Print response with formatting
-    console.log(`${chalk.blue.bold('Assistant:')} ${response}`);
+    console.log(`${chalk.red.bold('DOOM:')} ${response}`);
     return 0;
   } catch (error) {
     console.error(`${chalk.red('❌ Error:')} ${error instanceof Error ? error.message : String(error)}`);
@@ -452,8 +571,14 @@ if (cliArgs.cmd) {
   });
 } else {
   // Interactive REPL mode
-  main().catch(error => {
+  runInteractiveMode().catch(error => {
     console.error(chalk.red(`\nFatal error: ${error}`));
     process.exit(1);
   });
 }
+
+// Start the CLI
+main().catch(error => {
+  console.error(chalk.red(`\nFatal error: ${error}`));
+  process.exit(1);
+});
