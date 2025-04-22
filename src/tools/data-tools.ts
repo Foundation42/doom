@@ -58,33 +58,115 @@ export const jsonParserTool: Tool = {
       
       // Validate against schema if provided
       if (schema) {
-        // In a real implementation, use a library like ajv for validation
-        // This is a simple placeholder
-        const validationIssues: string[] = [];
+        const validationErrors = validateAgainstSchema(parsedData, schema);
         
-        // Simple type checking for demonstration
-        if (schema.type === 'object' && typeof parsedData !== 'object') {
-          validationIssues.push(`Expected object, got ${typeof parsedData}`);
-        } else if (schema.type === 'array' && !Array.isArray(parsedData)) {
-          validationIssues.push(`Expected array, got ${typeof parsedData}`);
+        if (validationErrors.length > 0) {
+          const formatted = prettify 
+            ? JSON.stringify(parsedData, null, 2) 
+            : JSON.stringify(parsedData);
+          
+          return {
+            output: `JSON validation failed against schema. The following errors were found:\n- ${validationErrors.join('\n- ')}\n\nData:\n${formatted}`,
+            error: 'Schema validation failed',
+            data: parsedData,
+            validationErrors,
+            formatted: prettify ? formatted : undefined
+          };
+        }
+      }
+      
+      // Helper function to validate data against a schema
+      function validateAgainstSchema(data: any, schema: any, path: string = ''): string[] {
+        const errors: string[] = [];
+        
+        // Type validation
+        if (schema.type) {
+          if (schema.type === 'object' && (typeof data !== 'object' || data === null || Array.isArray(data))) {
+            errors.push(`${path || 'Root'}: Expected object, got ${Array.isArray(data) ? 'array' : typeof data}`);
+          } else if (schema.type === 'array' && !Array.isArray(data)) {
+            errors.push(`${path || 'Root'}: Expected array, got ${typeof data}`);
+          } else if (schema.type === 'string' && typeof data !== 'string') {
+            errors.push(`${path || 'Root'}: Expected string, got ${typeof data}`);
+          } else if (schema.type === 'number' && typeof data !== 'number') {
+            errors.push(`${path || 'Root'}: Expected number, got ${typeof data}`);
+          } else if (schema.type === 'boolean' && typeof data !== 'boolean') {
+            errors.push(`${path || 'Root'}: Expected boolean, got ${typeof data}`);
+          } else if (schema.type === 'null' && data !== null) {
+            errors.push(`${path || 'Root'}: Expected null, got ${typeof data}`);
+          }
         }
         
-        // Required properties check
-        if (schema.required && Array.isArray(schema.required)) {
+        // Required properties
+        if (schema.type === 'object' && schema.required && Array.isArray(schema.required)) {
           for (const prop of schema.required) {
-            if (!(prop in parsedData)) {
-              validationIssues.push(`Missing required property: ${prop}`);
+            if (data === null || data === undefined || !(prop in data)) {
+              errors.push(`${path || 'Root'}: Missing required property: ${prop}`);
             }
           }
         }
         
-        if (validationIssues.length > 0) {
-          return {
-            output: `JSON validation failed:\n${validationIssues.join('\n')}`,
-            error: 'Validation failed',
-            data: parsedData
-          };
+        // Object properties validation
+        if (schema.type === 'object' && schema.properties && typeof data === 'object' && data !== null && !Array.isArray(data)) {
+          for (const [propName, propSchema] of Object.entries(schema.properties)) {
+            if (propName in data) {
+              const propPath = path ? `${path}.${propName}` : propName;
+              errors.push(...validateAgainstSchema(data[propName], propSchema, propPath));
+            }
+          }
         }
+        
+        // Array items validation
+        if (schema.type === 'array' && schema.items && Array.isArray(data)) {
+          data.forEach((item, index) => {
+            const itemPath = path ? `${path}[${index}]` : `[${index}]`;
+            errors.push(...validateAgainstSchema(item, schema.items, itemPath));
+          });
+        }
+        
+        // Enum validation
+        if (schema.enum && Array.isArray(schema.enum)) {
+          if (!schema.enum.includes(data)) {
+            errors.push(`${path || 'Root'}: Value must be one of [${schema.enum.join(', ')}], got ${data}`);
+          }
+        }
+        
+        // Numeric constraints
+        if (typeof data === 'number') {
+          if (schema.minimum !== undefined && data < schema.minimum) {
+            errors.push(`${path || 'Root'}: Value ${data} is less than minimum ${schema.minimum}`);
+          }
+          if (schema.maximum !== undefined && data > schema.maximum) {
+            errors.push(`${path || 'Root'}: Value ${data} is greater than maximum ${schema.maximum}`);
+          }
+        }
+        
+        // String constraints
+        if (typeof data === 'string') {
+          if (schema.minLength !== undefined && data.length < schema.minLength) {
+            errors.push(`${path || 'Root'}: String length ${data.length} is less than minLength ${schema.minLength}`);
+          }
+          if (schema.maxLength !== undefined && data.length > schema.maxLength) {
+            errors.push(`${path || 'Root'}: String length ${data.length} is greater than maxLength ${schema.maxLength}`);
+          }
+          if (schema.pattern) {
+            const regex = new RegExp(schema.pattern);
+            if (!regex.test(data)) {
+              errors.push(`${path || 'Root'}: String does not match pattern ${schema.pattern}`);
+            }
+          }
+        }
+        
+        // Array constraints
+        if (Array.isArray(data)) {
+          if (schema.minItems !== undefined && data.length < schema.minItems) {
+            errors.push(`${path || 'Root'}: Array length ${data.length} is less than minItems ${schema.minItems}`);
+          }
+          if (schema.maxItems !== undefined && data.length > schema.maxItems) {
+            errors.push(`${path || 'Root'}: Array length ${data.length} is greater than maxItems ${schema.maxItems}`);
+          }
+        }
+        
+        return errors;
       }
       
       // Format the output
@@ -94,7 +176,10 @@ export const jsonParserTool: Tool = {
       
       return {
         output: `Successfully parsed JSON data:\n\n${formatted.substring(0, 1000)}${formatted.length > 1000 ? '...(truncated)' : ''}`,
-        data: parsedData
+        data: parsedData,
+        formatted: prettify ? formatted : undefined,
+        schema: schema ? true : undefined,
+        isValid: schema ? true : undefined
       };
     }, (error) => {
       return `JSON parsing failed: ${error.message}`;
@@ -113,13 +198,19 @@ export const csvTool: Tool = {
     properties: {
       input: { 
         type: 'string', 
-        description: 'The CSV data to process' 
+        description: 'The CSV data to process or JSON data to convert to CSV' 
       },
-      operation: { 
+      inputFormat: {
         type: 'string',
-        enum: ['parse', 'toJson', 'transform'],
-        description: 'Operation to perform on the CSV data',
-        default: 'parse'
+        enum: ['csv', 'json'],
+        description: 'Format of the input data',
+        default: 'csv'
+      },
+      outputFormat: {
+        type: 'string',
+        enum: ['csv', 'json', 'table'],
+        description: 'Format of the output data',
+        default: 'json'
       },
       delimiter: { 
         type: 'string', 
@@ -131,15 +222,46 @@ export const csvTool: Tool = {
         description: 'Whether the CSV data has a header row',
         default: true
       },
+      quote: {
+        type: 'string',
+        description: 'Quote character for CSV fields',
+        default: '"'
+      },
+      escapeChar: {
+        type: 'string',
+        description: 'Character to escape quotes in CSV fields',
+        default: '"'
+      },
+      filterColumn: {
+        type: 'string',
+        description: 'Column to filter on (if filtering is needed)'
+      },
+      filterValue: {
+        type: 'string',
+        description: 'Value to filter by (if filtering is needed)'
+      },
+      filterOperator: {
+        type: 'string',
+        enum: ['=', '!=', '>', '<', '>=', '<=', 'contains', 'startsWith', 'endsWith'],
+        description: 'Operator to use for filtering',
+        default: '='
+      },
       transformations: {
         type: 'array',
-        description: 'Transformations to apply (for transform operation)',
+        description: 'Transformations to apply to columns',
         items: {
           type: 'object',
           properties: {
             column: { type: 'string' },
-            operation: { type: 'string', enum: ['uppercase', 'lowercase', 'trim', 'number'] }
-          }
+            operation: { 
+              type: 'string', 
+              enum: ['uppercase', 'lowercase', 'trim', 'number', 'dateFormat', 'replace'] 
+            },
+            from: { type: 'string', description: 'For replace operation - text to replace' },
+            to: { type: 'string', description: 'For replace operation - replacement text' },
+            format: { type: 'string', description: 'For dateFormat operation - date format' }
+          },
+          required: ['column', 'operation']
         }
       }
     },
@@ -148,116 +270,328 @@ export const csvTool: Tool = {
   },
   func: async (args: { 
     input: string; 
-    operation?: string; 
+    inputFormat?: string; 
+    outputFormat?: string; 
     delimiter?: string;
     hasHeader?: boolean;
-    transformations?: Array<{ column: string; operation: string }>;
+    quote?: string;
+    escapeChar?: string;
+    filterColumn?: string;
+    filterValue?: string;
+    filterOperator?: string;
+    transformations?: Array<{ 
+      column: string; 
+      operation: string;
+      from?: string;
+      to?: string;
+      format?: string;
+    }>;
   }): Promise<ToolResult> => {
     return safeToolExecution(async () => {
       const { 
         input, 
-        operation = 'parse', 
+        inputFormat = 'csv', 
+        outputFormat = 'json', 
         delimiter = ',',
         hasHeader = true,
+        quote = '"',
+        escapeChar = '"',
+        filterColumn,
+        filterValue,
+        filterOperator = '=',
         transformations = []
       } = args;
       
-      // Parse CSV
-      const lines = input.trim().split('\n');
-      const headers = hasHeader ? lines[0].split(delimiter).map(h => h.trim()) : [];
-      const dataRows = hasHeader ? lines.slice(1) : lines;
+      let headers: string[] = [];
+      let data: any[] = [];
       
-      // Convert to array of arrays
-      const data = dataRows.map(line => line.split(delimiter).map(cell => cell.trim()));
-      
-      // Perform the requested operation
-      switch (operation) {
-        case 'parse':
-          return {
-            output: `Parsed CSV data with ${data.length} rows and ${headers.length || data[0]?.length || 0} columns`,
-            data: {
-              headers: hasHeader ? headers : [],
-              rows: data
-            }
-          };
+      // Parse the input data based on format
+      if (inputFormat === 'csv') {
+        // Parse CSV with proper handling of quotes and escapes
+        const parseCSV = (csv: string): { headers: string[], data: string[][] } => {
+          const lines = csv.trim().split('\n');
+          if (lines.length === 0) return { headers: [], data: [] };
           
-        case 'toJson':
-          // Convert to array of objects if headers exist
-          const jsonData = hasHeader 
-            ? data.map(row => {
-                const obj: Record<string, string> = {};
-                headers.forEach((header, i) => {
-                  obj[header] = row[i] || '';
-                });
-                return obj;
-              })
-            : data; // Return as array of arrays if no headers
+          // Function to parse a CSV line respecting quotes
+          const parseLine = (line: string): string[] => {
+            const result: string[] = [];
+            let inQuote = false;
+            let current = '';
+            let i = 0;
             
-          return {
-            output: `Converted CSV to JSON with ${jsonData.length} entries`,
-            data: jsonData
-          };
-          
-        case 'transform':
-          if (!hasHeader) {
-            return {
-              output: 'Cannot transform CSV without headers',
-              error: 'Headers required for transformation'
-            };
-          }
-          
-          if (!transformations.length) {
-            return {
-              output: 'No transformations specified',
-              error: 'Missing transformations'
-            };
-          }
-          
-          // Apply transformations
-          const transformedData = data.map(row => {
-            const newRow = [...row];
-            
-            transformations.forEach(transform => {
-              const columnIndex = headers.indexOf(transform.column);
-              if (columnIndex >= 0) {
-                // Apply the transformation
-                switch (transform.operation) {
-                  case 'uppercase':
-                    newRow[columnIndex] = newRow[columnIndex].toUpperCase();
-                    break;
-                  case 'lowercase':
-                    newRow[columnIndex] = newRow[columnIndex].toLowerCase();
-                    break;
-                  case 'trim':
-                    newRow[columnIndex] = newRow[columnIndex].trim();
-                    break;
-                  case 'number':
-                    newRow[columnIndex] = newRow[columnIndex].replace(/[^0-9.-]/g, '');
-                    break;
+            while (i < line.length) {
+              const char = line[i];
+              const nextChar = line[i + 1];
+              
+              // Handle quote character
+              if (char === quote) {
+                if (inQuote && nextChar === quote) {
+                  // Escaped quote inside quoted field
+                  current += quote;
+                  i += 2; // Skip the escaped quote
+                  continue;
                 }
+                // Toggle quote state
+                inQuote = !inQuote;
+                i++;
+                continue;
               }
-            });
+              
+              // Handle delimiter
+              if (char === delimiter && !inQuote) {
+                result.push(current);
+                current = '';
+                i++;
+                continue;
+              }
+              
+              // Normal character
+              current += char;
+              i++;
+            }
             
-            return newRow;
+            // Add the last field
+            result.push(current);
+            return result;
+          };
+          
+          const parsedLines = lines.map(parseLine);
+          const headers = hasHeader ? parsedLines[0].map(h => h.trim()) : [];
+          const data = hasHeader ? parsedLines.slice(1) : parsedLines;
+          
+          return { headers, data };
+        };
+        
+        const parsed = parseCSV(input);
+        headers = parsed.headers;
+        data = parsed.data;
+      } else if (inputFormat === 'json') {
+        // Parse JSON input
+        try {
+          const jsonData = JSON.parse(input);
+          
+          if (Array.isArray(jsonData)) {
+            if (jsonData.length > 0) {
+              if (typeof jsonData[0] === 'object' && jsonData[0] !== null) {
+                // Array of objects - extract headers from first object
+                headers = Object.keys(jsonData[0]);
+                data = jsonData.map(item => headers.map(h => item[h]?.toString() || ''));
+              } else {
+                // Array of arrays
+                headers = [];
+                data = jsonData.map(row => 
+                  Array.isArray(row) ? row.map(cell => cell?.toString() || '') : [row?.toString() || '']
+                );
+              }
+            }
+          } else if (typeof jsonData === 'object' && jsonData !== null) {
+            // Single object
+            headers = Object.keys(jsonData);
+            data = [headers.map(h => jsonData[h]?.toString() || '')];
+          } else {
+            throw new Error('Invalid JSON format - expected array or object');
+          }
+        } catch (error) {
+          return {
+            output: `Failed to parse JSON: ${error instanceof Error ? error.message : String(error)}`,
+            error: 'Invalid JSON input'
+          };
+        }
+      }
+      
+      // Apply filtering if requested
+      if (filterColumn && filterValue !== undefined) {
+        const columnIndex = headers.indexOf(filterColumn);
+        
+        if (columnIndex >= 0) {
+          data = data.filter(row => {
+            const cellValue = row[columnIndex];
+            
+            // Apply the appropriate comparison
+            switch (filterOperator) {
+              case '=':
+                return cellValue === filterValue;
+              case '!=':
+                return cellValue !== filterValue;
+              case '>':
+                return parseFloat(cellValue) > parseFloat(filterValue);
+              case '<':
+                return parseFloat(cellValue) < parseFloat(filterValue);
+              case '>=':
+                return parseFloat(cellValue) >= parseFloat(filterValue);
+              case '<=':
+                return parseFloat(cellValue) <= parseFloat(filterValue);
+              case 'contains':
+                return cellValue.includes(filterValue);
+              case 'startsWith':
+                return cellValue.startsWith(filterValue);
+              case 'endsWith':
+                return cellValue.endsWith(filterValue);
+              default:
+                return true;
+            }
+          });
+        }
+      }
+      
+      // Apply transformations if specified
+      if (transformations.length > 0 && headers.length > 0) {
+        data = data.map(row => {
+          const newRow = [...row];
+          
+          transformations.forEach(transform => {
+            const columnIndex = headers.indexOf(transform.column);
+            if (columnIndex >= 0) {
+              // Apply the transformation
+              switch (transform.operation) {
+                case 'uppercase':
+                  newRow[columnIndex] = newRow[columnIndex].toUpperCase();
+                  break;
+                case 'lowercase':
+                  newRow[columnIndex] = newRow[columnIndex].toLowerCase();
+                  break;
+                case 'trim':
+                  newRow[columnIndex] = newRow[columnIndex].trim();
+                  break;
+                case 'number':
+                  newRow[columnIndex] = newRow[columnIndex].replace(/[^0-9.-]/g, '');
+                  break;
+                case 'dateFormat':
+                  // Basic date formatting for demonstration
+                  try {
+                    const date = new Date(newRow[columnIndex]);
+                    if (!isNaN(date.getTime())) {
+                      if (transform.format === 'ISO') {
+                        newRow[columnIndex] = date.toISOString();
+                      } else if (transform.format === 'simple') {
+                        newRow[columnIndex] = `${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
+                      } else {
+                        newRow[columnIndex] = date.toLocaleDateString();
+                      }
+                    }
+                  } catch (e) {
+                    // Keep original if error
+                  }
+                  break;
+                case 'replace':
+                  if (transform.from && transform.to) {
+                    newRow[columnIndex] = newRow[columnIndex].replace(
+                      new RegExp(transform.from, 'g'), 
+                      transform.to
+                    );
+                  }
+                  break;
+              }
+            }
           });
           
-          // Convert back to CSV
-          const transformedCsv = [
-            headers.join(delimiter),
-            ...transformedData.map(row => row.join(delimiter))
-          ].join('\n');
-          
-          return {
-            output: `Applied transformations to ${transformedData.length} rows`,
-            data: transformedCsv
-          };
-          
-        default:
-          return {
-            output: `Operation not supported: ${operation}`,
-            error: 'Unsupported operation'
-          };
+          return newRow;
+        });
       }
+      
+      // Format the output based on requested format
+      if (outputFormat === 'json') {
+        // Format as JSON objects if we have headers
+        const jsonData = headers.length > 0
+          ? data.map(row => {
+              const obj: Record<string, string> = {};
+              headers.forEach((header, i) => {
+                obj[header] = row[i] || '';
+              });
+              return obj;
+            })
+          : data; // Return as array of arrays if no headers
+          
+        return {
+          output: `Processed CSV data with ${data.length} rows and ${headers.length || data[0]?.length || 0} columns`,
+          data: jsonData
+        };
+      } else if (outputFormat === 'csv') {
+        // Format as CSV
+        // Helper to properly escape CSV values
+        const escapeCSV = (value: string): string => {
+          if (value.includes(delimiter) || value.includes(quote) || value.includes('\n')) {
+            // Escape quotes by doubling them
+            const escaped = value.replace(new RegExp(quote, 'g'), quote + quote);
+            return `${quote}${escaped}${quote}`;
+          }
+          return value;
+        };
+        
+        const csvLines = [];
+        
+        // Add headers if present
+        if (headers.length > 0) {
+          csvLines.push(headers.map(escapeCSV).join(delimiter));
+        }
+        
+        // Add data rows
+        for (const row of data) {
+          csvLines.push(row.map(escapeCSV).join(delimiter));
+        }
+        
+        return {
+          output: `Processed CSV data with ${data.length} rows and ${headers.length || data[0]?.length || 0} columns`,
+          data: csvLines.join('\n')
+        };
+      } else if (outputFormat === 'table') {
+        // Format as ASCII table (for display purposes)
+        const formatTable = (headers: string[], data: string[][]): string => {
+          if (data.length === 0) return 'Empty table';
+          
+          // Calculate column widths
+          const allRows = headers.length > 0 ? [headers, ...data] : data;
+          const columnCount = Math.max(...allRows.map(row => row.length));
+          const columnWidths: number[] = [];
+          
+          for (let i = 0; i < columnCount; i++) {
+            columnWidths.push(Math.max(...allRows.map(row => (row[i] || '').toString().length), 5));
+          }
+          
+          // Create separator line
+          const separator = '+' + columnWidths.map(w => '-'.repeat(w + 2)).join('+') + '+';
+          
+          // Format rows
+          const formatRow = (row: string[]): string => {
+            return '| ' + row.map((cell, i) => {
+              const value = (cell || '').toString();
+              return value.padEnd(columnWidths[i]);
+            }).join(' | ') + ' |';
+          };
+          
+          // Assemble table
+          const tableRows = [];
+          tableRows.push(separator);
+          
+          if (headers.length > 0) {
+            tableRows.push(formatRow(headers));
+            tableRows.push(separator);
+          }
+          
+          data.forEach(row => {
+            tableRows.push(formatRow(row));
+          });
+          
+          tableRows.push(separator);
+          return tableRows.join('\n');
+        };
+        
+        const table = formatTable(headers, data);
+        
+        return {
+          output: `Processed CSV data with ${data.length} rows and ${headers.length || data[0]?.length || 0} columns\n\n${table}`,
+          data: {
+            headers,
+            rows: data
+          }
+        };
+      }
+      
+      // Default case if no format matched
+      return {
+        output: `Output format not supported: ${outputFormat}`,
+        error: 'Unsupported output format'
+      };
     }, (error) => {
       return `CSV processing failed: ${error.message}`;
     });
