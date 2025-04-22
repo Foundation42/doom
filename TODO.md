@@ -72,6 +72,20 @@ This document outlines planned enhancements and improvements for the DOOM librar
   - [ ] Create reproducible benchmark scenarios
   - [ ] Add comparison tooling for performance regression detection
 
+## CLI & User Experience
+
+- [ ] **Enhanced CLI Interface**
+  - [ ] Implement full arrow key history navigation
+  - [ ] Add command-line editing with cursor movement
+  - [ ] Support for command completion
+  - [ ] Add color themes and customization options
+
+- [ ] **REPL Improvements**
+  - [ ] Save and load conversation sessions
+  - [ ] Export conversations to markdown or other formats
+  - [ ] Add multi-line input support
+  - [ ] Implement proper terminal UI with panels and views
+
 ## Documentation & Examples
 
 - [ ] **Advanced Documentation**

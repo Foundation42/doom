@@ -34,6 +34,12 @@ doom "What's the weather in Tokyo?"
 
 # Use parallel execution for faster results
 doom --parallel "Compare the weather in London, New York and Tokyo"
+
+# REPL commands
+# /help     - Show help message
+# /tools    - List available tools
+# /clear    - Clear conversation history
+# /exit     - Exit DOOM
 ```
 
 ## Features
