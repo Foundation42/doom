@@ -555,6 +555,11 @@ export const networkInfoTool: Tool = {
               : 'Failed'
           }\n`;
           
+          // Include the actual ping output
+          if (connectivityInfo.ping && connectivityInfo.ping.output) {
+            output += `\nPing Details:\n${connectivityInfo.ping.output}\n`;
+          }
+          
         } catch (error) {
           connectivityInfo.error = String(error);
           output += '\nConnectivity Test Failed.\n';
@@ -667,7 +672,7 @@ export const commandTool: Tool = {
         });
         
         return {
-          output: `Command executed successfully:\n\n${stdout}${stderr ? `\nStderr: ${stderr}` : ''}`,
+          output: `Command executed: "${command}"\n\nResults:\n${stdout}${stderr ? `\nStderr: ${stderr}` : ''}`,
           stdout,
           stderr,
           command,
@@ -676,7 +681,7 @@ export const commandTool: Tool = {
       } catch (error) {
         const errObj = error as any;
         return {
-          output: `Error executing command: ${errObj.message}\n${errObj.stderr || ''}`,
+          output: `Command failed: "${command}"\nError: ${errObj.message}\n${errObj.stderr || ''}`,
           error: errObj.message,
           stderr: errObj.stderr,
           stdout: errObj.stdout,
