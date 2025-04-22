@@ -32,6 +32,27 @@ try {
     cwd: rootDir
   });
   
+  // Fix any remaining ChatRunner references in the generated files
+  console.log('Fixing any remaining branding references...');
+  try {
+    // Fix ChatRunner references in the original doom-cli.ts file
+    const doomCliContent = fs.readFileSync(path.join(rootDir, 'examples', 'doom-cli.ts'), 'utf8');
+    const fixedContent = doomCliContent
+      .replace(/Welcome to the enhanced ChatRunner REPL with standard library tools/g, 
+               'Welcome to DOOM - The AI agent that *doesn\'t* ruin everything')
+      .replace(/An API key is required for ChatRunner to function/g, 
+               'An API key is required for DOOM to function');
+    fs.writeFileSync(path.join(rootDir, 'examples', 'doom-cli.ts'), fixedContent);
+    
+    // Also fix in the bundle
+    execSync(`sed -i 's/ChatRunner/DOOM/g' ${outputFile}`, {
+      stdio: 'inherit',
+      cwd: rootDir
+    });
+  } catch (e) {
+    console.warn('Warning: Could not fix branding references:', e.message);
+  }
+  
   console.log('DOOM CLI built successfully!');
   
   // Create the bin script
