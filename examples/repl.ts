@@ -1,5 +1,5 @@
 /**
- * Enhanced REPL for ChatRunner with standard library tools and improved UI
+ * Enhanced REPL interface with standard library tools and improved UI
  * 
  * Usage:
  *   npm run repl                    - Start interactive REPL
@@ -280,7 +280,7 @@ Keep responses focused and concise.`;
  */
 async function main() {
   console.log(banner);
-  console.log(`${chalk.yellow('Welcome to the enhanced ChatRunner REPL with standard library tools.')}`);
+  console.log(`${chalk.yellow('Welcome to the enhanced REPL with standard library tools.')}`);
   
   // Initialize with parallel flag
   let parallelExecution = false;
@@ -436,7 +436,7 @@ loadEnvFromDir();
 // If no OpenAI key, prompt user
 if (!process.env.OPENAI_API_KEY) {
   console.log(chalk.yellow('🔑 OpenAI API key not found in environment or ~/.env'));
-  console.log(chalk.gray('An API key is required for ChatRunner to function.'));
+  console.log(chalk.gray('An API key is required for this tool to function.'));
   const apiKey = readline.question(chalk.cyan('Enter your OpenAI API key: '), { hideEchoBack: true });
   process.env.OPENAI_API_KEY = apiKey;
 }

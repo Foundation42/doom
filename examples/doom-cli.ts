@@ -105,10 +105,10 @@ For more details visit: https://github.com/Foundation42/doom`);
  */
 // Import statement removed
 // Import statement removed
-  runChatWithTools, 
-  createConsoleLogger,
-  createStandardTools,
-  speakTextTool
+// Import statement removed
+// Import statement removed
+// Import statement removed
+// Import statement removed
 // Import statement removed
 // Import statement removed
 // Import statement removed
@@ -399,7 +399,7 @@ Keep responses focused and concise.`;
  */
 async function runInteractiveMode(parallelExecution = false) {
   console.log(banner);
-  console.log(`${chalk.yellow('Welcome to the enhanced ChatRunner REPL with standard library tools.')}`);
+  console.log(`${chalk.yellow('Welcome to DOOM - The AI agent that *doesn\'t* ruin everything.')}`);
   
   // Initialize with parallel flag
   // Parallel execution flag is now passed as parameter
@@ -555,7 +555,7 @@ loadEnvFromDir();
 // If no OpenAI key, prompt user
 if (!process.env.OPENAI_API_KEY) {
   console.log(chalk.yellow('🔑 OpenAI API key not found in environment or ~/.env'));
-  console.log(chalk.gray('An API key is required for ChatRunner to function.'));
+  console.log(chalk.gray('An API key is required for DOOM to function.'));
   const apiKey = readline.question(chalk.cyan('Enter your OpenAI API key: '), { hideEchoBack: true });
   process.env.OPENAI_API_KEY = apiKey;
 }

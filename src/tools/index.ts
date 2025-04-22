@@ -1,5 +1,5 @@
 /**
- * Standard library of reusable tools for ChatRunner
+ * Standard library of reusable tools
  */
 import { Tool, ToolResult } from '../types';
 import { createHttpTools } from './http-tools';

@@ -135,7 +135,7 @@ async function runToolsDemo() {
 // Print demo instructions
 console.log(`
 ==================================================
-= ChatRunner Standard Tools Library Demo         =
+= Standard Tools Library Demo                    =
 ==================================================
 
 This demo showcases the standard tools library.

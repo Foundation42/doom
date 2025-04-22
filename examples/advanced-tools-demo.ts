@@ -27,7 +27,7 @@ async function demoTTS() {
   try {
     logger.info('\nDemonstrating basic text-to-speech...');
     const result1 = await speakTextTool.func({ 
-      text: 'Hello! This is a demonstration of the text to speech tool in ChatRunner. It converts text to lifelike speech.',
+      text: 'Hello! This is a demonstration of the text to speech tool. It converts text to lifelike speech.',
       voice: 'nova'
     });
     console.log(result1.output);
