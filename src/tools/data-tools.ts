@@ -275,7 +275,11 @@ export const filterDataTool: Tool = {
     properties: {
       data: { 
         type: 'array', 
-        description: 'The array of data objects to filter' 
+        description: 'The array of data objects to filter',
+        items: {
+          type: 'object',
+          description: 'Data object to filter'
+        }
       },
       filters: { 
         type: 'array',
@@ -288,7 +292,12 @@ export const filterDataTool: Tool = {
               type: 'string', 
               enum: ['equals', 'notEquals', 'contains', 'greaterThan', 'lessThan', 'in'] 
             },
-            value: { type: ['string', 'number', 'boolean', 'array'] }
+            value: { 
+              type: ['string', 'number', 'boolean', 'array'],
+              items: {
+                type: ['string', 'number', 'boolean']
+              }
+            }
           }
         }
       },
@@ -403,7 +412,11 @@ export const chartGeneratorTool: Tool = {
     properties: {
       data: { 
         type: 'array', 
-        description: 'The data to visualize' 
+        description: 'The data to visualize', 
+        items: {
+          type: 'object',
+          description: 'Data point to visualize'
+        }
       },
       chartType: { 
         type: 'string',
