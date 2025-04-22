@@ -50,15 +50,20 @@ npm run tools:local
 
 # Run advanced tools demo locally (no API key needed)
 npm run tools:advanced
+
+# Run advanced AI tools demo (requires OpenAI API key)
+npm run tools:ai
 ```
 
 ### API Key Configuration
 
-The examples will check for your OpenAI API key in the following order:
+The examples will check for API keys in the following order:
 
-1. Environment variable: `OPENAI_API_KEY`
-2. Home directory file: `~/.env` (format: `OPENAI_API_KEY=sk-...`)
-3. Manual input: If no key is found, it will prompt you to enter one
+1. Environment variables: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, `MISTRAL_API_KEY`, etc.
+2. Home directory file: `~/.env` (format: `OPENAI_API_KEY=sk-...`, one per line)
+3. Manual input: If no key is found, some examples will prompt you to enter one
+
+For the advanced AI tools demo, at least the OpenAI API key is required. Additional provider keys are optional but enable the multi-provider comparison features.
 
 ## Basic Usage
 
@@ -263,6 +268,18 @@ const result = await runChatWithTools(messages, allTools);
    - `environment`: Works with environment variables
    - `networkInfo`: Shows network interfaces and connectivity
    - `executeCommand`: Runs safe system commands with security limits
+
+7. **LLM Tools** (requires API keys)
+   - `multiProviderCompletion`: Sends prompts to different LLM providers (OpenAI, Anthropic, Google, etc.)
+   - `adaptiveCompletion`: Automatically selects appropriate models based on task types
+   - `transformText`: Specialized text transformations using task-specific models
+   - `compareLLMResponses`: Compares responses from multiple LLM providers for the same prompt
+   - `chainOfThought`: Step-by-step reasoning for complex problem solving
+
+8. **TTS Tools** (requires OpenAI API key)
+   - `speakText`: Basic text-to-speech with voice selection
+   - `narrateContent`: Specialized narration styles for different content types
+   - `expressiveSpeech`: Character and emotion-based speech generation
 
 ### Helper Utilities
 

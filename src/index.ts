@@ -26,6 +26,8 @@ export {
   createFileTools,
   createAiTools,
   createSystemTools,
+  createTTSTools,
+  createLLMTools,
   
   // Specific tools (for direct usage)
   // HTTP Tools
@@ -65,7 +67,19 @@ export {
   processInfoTool,
   environmentTool,
   networkInfoTool,
-  commandTool
+  commandTool,
+  
+  // TTS Tools
+  speakTextTool,
+  narrateContentTool,
+  expressiveSpeechTool,
+  
+  // LLM Tools
+  multiProviderCompletionTool,
+  adaptiveCompletionTool,
+  transformTextTool,
+  compareLLMResponsesTool,
+  chainOfThoughtTool
 } from './tools';
 
 // Example default logger

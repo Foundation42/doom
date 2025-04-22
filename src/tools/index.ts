@@ -8,6 +8,8 @@ import { createUtilityTools } from './utility-tools';
 import { createFileTools } from './file-tools';
 import { createAiTools } from './ai-tools';
 import { createSystemTools } from './system-tools';
+import { createTTSTools } from './tts-tools';
+import { createLLMTools } from './llm-tools';
 
 // Export all tool-related utilities
 export * from './http-tools';
@@ -16,6 +18,8 @@ export * from './utility-tools';
 export * from './file-tools';
 export * from './ai-tools';
 export * from './system-tools';
+export * from './tts-tools';
+export * from './llm-tools';
 
 /**
  * Creates a standard library of useful tools
@@ -28,7 +32,9 @@ export function createStandardTools(): Tool[] {
     ...createUtilityTools(),
     ...createFileTools(),
     ...createAiTools(),
-    ...createSystemTools()
+    ...createSystemTools(),
+    ...createTTSTools(),
+    ...createLLMTools()
   ];
 }
 

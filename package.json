@@ -13,13 +13,19 @@
     "parallel": "ts-node examples/parallel.ts",
     "tools": "ts-node examples/tools-demo.ts",
     "tools:local": "ts-node examples/tools-demo-local.ts",
-    "tools:advanced": "ts-node examples/tools-demo-advanced.ts"
+    "tools:advanced": "ts-node examples/tools-demo-advanced.ts",
+    "tools:ai": "ts-node examples/advanced-tools-demo.ts"
   },
   "dependencies": {
     "abort-controller": "^3.0.0",
     "dotenv": "^16.0.3",
     "node-fetch": "^2.6.9",
-    "readline-sync": "^1.4.10"
+    "readline-sync": "^1.4.10",
+    "openai": "^4.86.1",
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@google-cloud/vertexai": "^1.9.3",
+    "@google/generative-ai": "^0.22.0",
+    "@mistralai/mistralai": "^1.5.0"
   },
   "devDependencies": {
     "@types/jest": "^29.5.1",
