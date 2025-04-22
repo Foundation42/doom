@@ -281,12 +281,12 @@ Return only the JSON with no other text.`;
         
         // Filter any keywords that don't meet the minimum length
         const filteredKeywords = result.keywords
-          .filter(keyword => typeof keyword === 'string' && keyword.length >= minLength)
+          .filter((keyword: any) => typeof keyword === 'string' && keyword.length >= minLength)
           .slice(0, maxKeywords);
         
         // Create frequencies object (we don't have real frequencies, but we'll simulate them)
         const frequencies: Record<string, number> = {};
-        filteredKeywords.forEach((keyword, index) => {
+        filteredKeywords.forEach((keyword: string, index: number) => {
           // Assign descending "importance" values as a proxy for frequency
           frequencies[keyword] = 1 - (index / (filteredKeywords.length * 2));
         });
@@ -470,7 +470,8 @@ Return only the JSON with no other text.`;
           
           return {
             output: `Text classified into ${matchingCategories.length} categories:\n` +
-                   matchingCategories.map(c => `${c.category} (${(c.confidence * 100).toFixed(1)}%)`).join(', '),
+                   matchingCategories.map((c: {category: string, confidence: number}) => 
+                     `${c.category} (${(c.confidence * 100).toFixed(1)}%)`).join(', '),
             classifications: matchingCategories,
             mode
           };

@@ -14,7 +14,8 @@
     "tools": "ts-node examples/tools-demo.ts",
     "tools:local": "ts-node examples/tools-demo-local.ts",
     "tools:advanced": "ts-node examples/tools-demo-advanced.ts",
-    "tools:ai": "ts-node examples/advanced-tools-demo.ts"
+    "tools:ai": "ts-node examples/advanced-tools-demo.ts",
+    "test:ai": "ts-node examples/ai-tools-test.ts"
   },
   "dependencies": {
     "abort-controller": "^3.0.0",
