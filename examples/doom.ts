@@ -359,8 +359,14 @@ async function main() {
     // Create a custom prompt
     const input = readline.question(`\n${chalk.redBright.bold('DOOM:')} `);
     
+    // Check if input is empty or only whitespace
+    if (!input || !input.trim()) {
+      // Return empty string to skip processing empty input
+      return '';
+    }
+    
     // Add non-empty, non-slash-command input to history
-    if (input && input.trim() && !input.trim().startsWith('/')) {
+    if (input.trim() && !input.trim().startsWith('/')) {
       // Only add to history if not a duplicate of the most recent command
       if (commandHistory.length === 0 || commandHistory[commandHistory.length - 1] !== input) {
         commandHistory.push(input);
@@ -391,6 +397,11 @@ async function main() {
   while (true) {
     // Get user input with styled prompt and history
     const userInput = readLineWithHistory();
+    
+    // Skip empty inputs (just press Enter to get a new prompt)
+    if (!userInput) {
+      continue;
+    }
     
     // Check for REPL commands (now with / prefix)
     if (userInput.toLowerCase() === '/exit') {
