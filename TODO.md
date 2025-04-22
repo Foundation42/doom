@@ -1,6 +1,6 @@
-# ChatRunner: Future Improvements
+# DOOM: Future Improvements
 
-This document outlines planned enhancements and improvements for the ChatRunner library.
+This document outlines planned enhancements and improvements for the DOOM library.
 
 ## Concurrency Control & Backpressure
 
