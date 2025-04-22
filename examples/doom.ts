@@ -341,7 +341,7 @@ async function main() {
   console.log(chalk.redBright(`\n🔥 Armed with ${allTools.length} tools (${standardTools.length} standard + ${customTools.length} custom)`));
   
   // Display command help
-  console.log(chalk.gray('\nType "tools" to see available weapons, "help" for commands, or "exit" to quit.'));
+  console.log(chalk.gray('\nType "/tools" to see available weapons, "/help" for commands, or "/exit" to quit.'));
   
   // Initialize with system message
   let messages: Message[] = [
@@ -353,19 +353,32 @@ async function main() {
 
   // Command history storage
   const commandHistory: string[] = [];
-  let historyIndex = 0;
   
   // Custom readline interface with history support
   function readLineWithHistory(): string {
-    // Create a custom prompt with history support
-    const input = readline.question(`\n${chalk.redBright.bold('DOOM:')} `, {
-      history: commandHistory,
-      hideEchoBack: false
-    });
+    // Create a custom prompt
+    const input = readline.question(`\n${chalk.redBright.bold('DOOM:')} `);
     
     // Add non-empty, non-slash-command input to history
     if (input && input.trim() && !input.trim().startsWith('/')) {
-      commandHistory.push(input);
+      // Only add to history if not a duplicate of the most recent command
+      if (commandHistory.length === 0 || commandHistory[commandHistory.length - 1] !== input) {
+        commandHistory.push(input);
+        
+        // Save history to file (optional)
+        try {
+          const homedir = os.homedir();
+          const historyPath = path.join(homedir, '.doom_history');
+          fs.appendFileSync(historyPath, input + '\n');
+        } catch (e) {
+          // Silently fail if we can't write to history file
+        }
+      }
+    }
+    
+    // Log a tip about history the first time
+    if (commandHistory.length === 1) {
+      console.log(chalk.gray('💡 Tip: Use up/down arrow keys for command history in the next version. Currently use tab completion.'));
     }
     
     return input;
