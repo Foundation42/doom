@@ -174,7 +174,7 @@ function listTools(tools: Tool[]) {
     console.log('');
   });
   
-  console.log(chalk.gray('Type "help" for usage instructions or "exit" to quit.\n'));
+  console.log(chalk.gray('Type "/help" for usage instructions or "/exit" to quit.\n'));
 }
 
 /**
@@ -183,12 +183,12 @@ function listTools(tools: Tool[]) {
 function showHelp() {
   console.log(chalk.redBright.bold('\n🔥 DOOM Commands:'));
   console.log(`
-  ${chalk.yellow('exit')}          - Exit DOOM (if you dare)
-  ${chalk.yellow('help')}          - Show this help message
-  ${chalk.yellow('tools')}         - List all available weapons
-  ${chalk.yellow('clear')}         - Clear the conversation history
-  ${chalk.yellow('parallel on')}   - Enable parallel tool execution
-  ${chalk.yellow('parallel off')}  - Disable parallel tool execution
+  ${chalk.yellow('/exit')}          - Exit DOOM (if you dare)
+  ${chalk.yellow('/help')}          - Show this help message
+  ${chalk.yellow('/tools')}         - List all available weapons
+  ${chalk.yellow('/clear')}         - Clear the conversation history
+  ${chalk.yellow('/parallel on')}   - Enable parallel tool execution
+  ${chalk.yellow('/parallel off')}  - Disable parallel tool execution
   
 ${chalk.redBright.bold('💡 Tips:')}
   - Ask questions naturally and DOOM will use weapons appropriately
@@ -351,30 +351,53 @@ async function main() {
     }
   ];
 
+  // Command history storage
+  const commandHistory: string[] = [];
+  let historyIndex = 0;
+  
+  // Custom readline interface with history support
+  function readLineWithHistory(): string {
+    // Create a custom prompt with history support
+    const input = readline.question(`\n${chalk.redBright.bold('DOOM:')} `, {
+      history: commandHistory,
+      hideEchoBack: false
+    });
+    
+    // Add non-empty, non-slash-command input to history
+    if (input && input.trim() && !input.trim().startsWith('/')) {
+      commandHistory.push(input);
+    }
+    
+    return input;
+  }
+  
+  // Display the logo at startup
+  console.log(chalk.red(LOGO));
+  
   // REPL loop
   while (true) {
-    // Get user input with styled prompt
-    const userInput = readline.question(`\n${chalk.redBright.bold('DOOM:')} `);
+    // Get user input with styled prompt and history
+    const userInput = readLineWithHistory();
     
-    // Check for REPL commands
-    if (userInput.toLowerCase() === 'exit') {
+    // Check for REPL commands (now with / prefix)
+    if (userInput.toLowerCase() === '/exit') {
       console.log(chalk.blue('👋 Goodbye!'));
       break;
-    } else if (userInput.toLowerCase() === 'help') {
+    } else if (userInput.toLowerCase() === '/help') {
       showHelp();
       continue;
-    } else if (userInput.toLowerCase() === 'tools') {
+    } else if (userInput.toLowerCase() === '/tools') {
       listTools(allTools);
       continue;
-    } else if (userInput.toLowerCase() === 'clear') {
+    } else if (userInput.toLowerCase() === '/clear') {
       messages = [messages[0]]; // Keep only the system message
       console.log(chalk.yellow('🧹 Conversation history cleared.'));
       continue;
-    } else if (userInput.toLowerCase() === 'parallel on') {
+    } else if (userInput.toLowerCase() === '/parallel on') {
       parallelExecution = true;
       console.log(chalk.yellow('🚀 Parallel tool execution enabled.'));
       continue;
-    } else if (userInput.toLowerCase() === 'parallel off') {
+    } else if (userInput.toLowerCase() === '/parallel off') {
       parallelExecution = false;
       console.log(chalk.yellow('🔄 Sequential tool execution enabled.'));
       continue;
@@ -466,13 +489,21 @@ async function runSingleCommand(command: string, useParallel: boolean = false) {
 // Current version
 const VERSION = '1.0.0';
 
+// DOOM logo (ASCII art for CLI)
+const LOGO = `  _____    ____    ____    __  __ 
+ |  __ \\  / __ \\  / __ \\  |  \\/  |
+ | |  | || |  | || |  | | | \\  / |
+ | |  | || |  | || |  | | | |\\/| |
+ | |__| || |__| || |__| | | |  | |
+ |_____/  \\____/  \\____/  |_|  |_|
+                                  
+ The AI agent that *doesn't* ruin everything.`;
+
 /**
  * Display the logo
  */
 function displayLogo() {
-  console.log(chalk.red.bold(banner.split('\n')[1]));
-  console.log(chalk.red.bold(banner.split('\n')[2]));
-  console.log(chalk.red.bold(banner.split('\n')[3]));
+  console.log(chalk.red.bold(LOGO));
 }
 
 // Parse command line arguments
