@@ -6,6 +6,7 @@ import { safeToolExecution } from './index';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as util from 'util';
+import * as minimatch from 'minimatch';
 
 // Promisified fs functions
 const readFile = util.promisify(fs.readFile);
@@ -286,8 +287,7 @@ export const listFilesTool: Tool = {
           
           // Filter by pattern if provided
           if (pattern) {
-            const minimatch = require('minimatch');
-            if (!minimatch(item.name, pattern)) {
+            if (!minimatch.minimatch(item.name, pattern)) {
               continue;
             }
           }
@@ -326,8 +326,46 @@ export const listFilesTool: Tool = {
       // List files
       const files = await listFilesRecursive(dirPath);
       
+      // Helper function to format file sizes
+      function formatFileSize(bytes: number): string {
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+        if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+        return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+      }
+      
+      // Prepare a more detailed output
+      let outputText = `Found ${files.length} items in ${dirPath}${pattern ? ` matching ${pattern}` : ''}:\n\n`;
+      
+      // Group files by type
+      const directories = files.filter(f => f.type === 'directory');
+      const regularFiles = files.filter(f => f.type === 'file');
+      
+      // Add directories first
+      if (directories.length > 0) {
+        outputText += `Directories (${directories.length}):\n`;
+        directories.forEach(dir => {
+          const dirDetails = details && dir.size !== undefined
+            ? ` (${dir.items || 0} items, modified: ${new Date(dir.modified).toISOString().split('T')[0]})`
+            : '';
+          outputText += `  📁 ${dir.name}${dirDetails}\n`;
+        });
+        outputText += '\n';
+      }
+      
+      // Then add files
+      if (regularFiles.length > 0) {
+        outputText += `Files (${regularFiles.length}):\n`;
+        regularFiles.forEach(file => {
+          const sizeStr = details && file.size !== undefined
+            ? ` (${formatFileSize(file.size)}, modified: ${new Date(file.modified).toISOString().split('T')[0]})`
+            : '';
+          outputText += `  📄 ${file.name}${sizeStr}\n`;
+        });
+      }
+      
       return {
-        output: `Found ${files.length} items in ${dirPath}${pattern ? ` matching ${pattern}` : ''}`,
+        output: outputText,
         files
       };
     }, (error) => {
@@ -548,8 +586,7 @@ export const searchFilesTool: Tool = {
             await searchFilesRecursive(fullPath, results);
           } else if (item.isFile()) {
             // Check if file matches the pattern
-            const minimatch = require('minimatch');
-            if (!minimatch(item.name, filePattern)) {
+            if (!minimatch.minimatch(item.name, filePattern)) {
               continue;
             }
             

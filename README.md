@@ -1,6 +1,6 @@
 # ChatRunner
 
-A TypeScript library for running chat sessions with OpenAI's tool-calling models with support for automatic subtasks.
+A TypeScript library for running chat sessions with LLM tool-calling models, featuring support for automatic subtasks, parallel execution, and a rich set of built-in tools.
 
 ## Features
 
@@ -35,6 +35,12 @@ npm run build
 
 # Run the interactive REPL
 npm run repl
+
+# Run a single command and exit
+npm run run "What's the weather in Tokyo?"
+
+# Run with parallel tool execution 
+npm run run "Compare the weather in Tokyo, London and New York" -- --parallel
 
 # Run the subtasks example
 npm run subtasks

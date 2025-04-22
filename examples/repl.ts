@@ -1,5 +1,9 @@
 /**
  * Enhanced REPL for ChatRunner with standard library tools and improved UI
+ * 
+ * Usage:
+ *   npm run repl                    - Start interactive REPL
+ *   npm run repl -- --cmd "command" - Run a single command and exit
  */
 import * as readline from 'readline-sync';
 import { 
@@ -67,6 +71,26 @@ function loadEnvFromDir() {
 
 // Create a custom logger for the REPL
 const replLogger = createConsoleLogger('', 'info');
+
+/**
+ * Parse command line arguments
+ * @returns Object with parsed command line options
+ */
+function parseCommandLineArgs() {
+  const args: { cmd?: string, parallel?: boolean } = {};
+  
+  // Process command line arguments
+  for (let i = 0; i < process.argv.length; i++) {
+    if (process.argv[i] === '--cmd' && i + 1 < process.argv.length) {
+      args.cmd = process.argv[i + 1];
+      i++; // Skip next arg since we consumed it
+    } else if (process.argv[i] === '--parallel') {
+      args.parallel = true;
+    }
+  }
+  
+  return args;
+}
 
 /**
  * Lists all available tools categories and their tools
@@ -150,13 +174,11 @@ ${chalk.cyan.bold('📋 Examples:')}
   `);
 }
 
-async function main() {
-  console.log(banner);
-  console.log(`${chalk.yellow('Welcome to the enhanced ChatRunner REPL with standard library tools.')}`);
-  
-  // Initialize with parallel flag
-  let parallelExecution = false;
-  
+/**
+ * Create standard and custom tools for the REPL
+ * @returns Object with standardTools, customTools and allTools
+ */
+function createTools() {
   // Set up all available tools (standard + custom)
   const standardTools = createStandardTools();
   
@@ -234,6 +256,36 @@ async function main() {
   // Combine all tools
   const allTools = [...standardTools, ...customTools];
   
+  return {
+    standardTools,
+    customTools,
+    allTools
+  };
+}
+
+/**
+ * Get default system message for the assistant
+ */
+function getSystemMessage(): string {
+  return `You are a helpful assistant with access to many advanced tools including file, AI, system, data, http, and utility tools.
+You can also use LLM tools for complex reasoning and TTS tools for text-to-speech if the user has API keys.
+When appropriate, identify which tool to use and provide all required arguments that match the tool's parameters schema.
+Keep responses focused and concise.`;
+}
+
+/**
+ * Run the interactive REPL
+ */
+async function main() {
+  console.log(banner);
+  console.log(`${chalk.yellow('Welcome to the enhanced ChatRunner REPL with standard library tools.')}`);
+  
+  // Initialize with parallel flag
+  let parallelExecution = false;
+  
+  // Set up tools
+  const { standardTools, customTools, allTools } = createTools();
+  
   // Display tool count
   console.log(chalk.green(`\n🛠️  Loaded ${allTools.length} tools (${standardTools.length} standard + ${customTools.length} custom)`));
   
@@ -244,10 +296,7 @@ async function main() {
   let messages: Message[] = [
     {
       role: 'system',
-      content: `You are a helpful assistant with access to many advanced tools including file, AI, system, data, http, and utility tools.
-You can also use LLM tools for complex reasoning and TTS tools for text-to-speech if the user has API keys.
-When appropriate, identify which tool to use and provide all required arguments that match the tool's parameters schema.
-Keep responses focused and concise.`
+      content: getSystemMessage()
     }
   ];
 
@@ -322,6 +371,62 @@ Keep responses focused and concise.`
   }
 }
 
+/**
+ * Run a single command and exit
+ */
+async function runSingleCommand(command: string, useParallel: boolean = false) {
+  console.log(chalk.gray('Running single command mode...'));
+  
+  // Set up tools
+  const { allTools } = createTools();
+  
+  // Initialize with system message
+  const messages: Message[] = [
+    {
+      role: 'system',
+      content: getSystemMessage()
+    },
+    {
+      role: 'user',
+      content: command
+    }
+  ];
+
+  try {
+    console.log(`${chalk.green.bold('Command:')} ${command}`);
+    console.log(`${chalk.blue('Assistant:')} ${chalk.gray('Thinking...')}`);
+
+    // Create AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+
+    // Run chat with tools
+    const response = await runChatWithTools(messages, allTools, {
+      signal: controller.signal,
+      temperature: 0.7,
+      logger: replLogger,
+      timeoutMs: 55000,
+      maxRetries: 2,
+      parallel: useParallel
+    });
+
+    clearTimeout(timeoutId);
+
+    // Print response with formatting
+    console.log(`${chalk.blue.bold('Assistant:')} ${response}`);
+    return 0;
+  } catch (error) {
+    console.error(`${chalk.red('❌ Error:')} ${error instanceof Error ? error.message : String(error)}`);
+    if (error instanceof Error && error.message === 'Aborted') {
+      console.log(chalk.yellow('⏱️ Request was aborted due to timeout.'));
+    }
+    return 1;
+  }
+}
+
+// Parse command line arguments
+const cliArgs = parseCommandLineArgs();
+
 // Check for API keys in .env or environment
 console.log(chalk.gray('Checking for API keys...'));
 loadEnvFromDir();
@@ -334,8 +439,19 @@ if (!process.env.OPENAI_API_KEY) {
   process.env.OPENAI_API_KEY = apiKey;
 }
 
-// Run the REPL
-main().catch(error => {
-  console.error(chalk.red(`\nFatal error: ${error}`));
-  process.exit(1);
-});
+// Run either single command or interactive REPL
+if (cliArgs.cmd) {
+  // Single command mode
+  runSingleCommand(cliArgs.cmd, cliArgs.parallel).then(exitCode => {
+    process.exit(exitCode);
+  }).catch(error => {
+    console.error(chalk.red(`\nFatal error: ${error}`));
+    process.exit(1);
+  });
+} else {
+  // Interactive REPL mode
+  main().catch(error => {
+    console.error(chalk.red(`\nFatal error: ${error}`));
+    process.exit(1);
+  });
+}

@@ -9,6 +9,7 @@
     "lint": "eslint . --ext .ts",
     "test": "jest",
     "repl": "ts-node examples/repl.ts",
+    "run": "ts-node examples/repl.ts --cmd",
     "subtasks": "ts-node examples/subtasks.ts",
     "parallel": "ts-node examples/parallel.ts",
     "tools": "ts-node examples/tools-demo.ts",
@@ -25,12 +26,14 @@
     "abort-controller": "^3.0.0",
     "chalk": "^4.1.2",
     "dotenv": "^16.0.3",
+    "minimatch": "^10.0.1",
     "node-fetch": "^2.6.9",
     "openai": "^4.86.1",
     "readline-sync": "^1.4.10"
   },
   "devDependencies": {
     "@types/jest": "^29.5.1",
+    "@types/minimatch": "^5.1.2",
     "@types/node": "^18.16.0",
     "@types/node-fetch": "^2.6.3",
     "@types/readline-sync": "^1.4.4",
