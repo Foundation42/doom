@@ -20,7 +20,8 @@
     "tools:advanced": "ts-node examples/tools-demo-advanced.ts",
     "tools:ai": "ts-node examples/advanced-tools-demo.ts",
     "test:ai": "ts-node examples/ai-tools-test.ts",
-    "doom": "ts-node cli/doom.ts"
+    "doom": "ts-node cli/doom.ts",
+    "doom:react": "ts-node cli/doom-react.ts"
   },
   "repository": {
     "type": "git",
