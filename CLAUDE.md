@@ -4,10 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 - Build: `npm run build` (compiles TypeScript)
+- Build CLI: `npm run build:cli` (builds the CLI executable)
+- Build all: `npm run build:all` (builds both library and CLI)
 - Lint: `npm run lint` (runs ESLint)
 - Test: `npm test` (runs all tests)
 - Run single test: `npm test -- -t "test name"`
-- Run REPL: `npm run repl` (interactive tool demo)
+- Run DOOM CLI: `npm run doom` (interactive CLI with tools)
 - Run subtasks example: `npm run subtasks`
 
 ## Code Style Guidelines

@@ -79,6 +79,7 @@ This document outlines planned enhancements and improvements for the DOOM librar
   - [ ] Add command-line editing with cursor movement
   - [ ] Support for command completion
   - [ ] Add color themes and customization options
+  - [x] Display tool calls visually with arguments and results
 
 - [ ] **REPL Improvements**
   - [ ] Save and load conversation sessions

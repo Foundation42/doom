@@ -11,7 +11,7 @@ const path = require('path');
 
 // Paths
 const rootDir = path.resolve(__dirname, '..');
-const sourceFile = path.join(rootDir, 'examples', 'doom.ts');
+const sourceFile = path.join(rootDir, 'cli', 'doom.ts');
 const outputDir = path.join(rootDir, 'dist', 'cli');
 const outputFile = path.join(outputDir, 'doom-cli.js');
 const binFile = path.join(rootDir, 'bin', 'doom.js');
@@ -35,14 +35,7 @@ try {
   // Fix any remaining branding references in the generated files
   console.log('Fixing any remaining branding references...');
   try {
-    // Fix branding references in the original doom-cli.ts file
-    const doomCliContent = fs.readFileSync(path.join(rootDir, 'examples', 'doom-cli.ts'), 'utf8');
-    const fixedContent = doomCliContent
-      .replace(/Welcome to the enhanced .* REPL with standard library tools/g, 
-               'Welcome to DOOM - The AI agent that *doesn\'t* ruin everything')
-      .replace(/An API key is required for .* to function/g, 
-               'An API key is required for DOOM to function');
-    fs.writeFileSync(path.join(rootDir, 'examples', 'doom-cli.ts'), fixedContent);
+    // No need to fix branding references as we've consolidated everything
     
     // Also fix in the bundle
     execSync(`sed -i 's/[Cc]hat[Rr]unner/DOOM/g' ${outputFile}`, {

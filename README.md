@@ -35,11 +35,22 @@ doom "What's the weather in Tokyo?"
 # Use parallel execution for faster results
 doom --parallel "Compare the weather in London, New York and Tokyo"
 
+# Hide tool execution visualization in interactive mode
+doom --notool
+
+# Show tool execution visualization in batch mode (hidden by default)
+doom --showtool "What's the weather in Tokyo?"
+
+# Force verbose output in batch mode
+doom --verbose "What's the weather in Tokyo?"
+
 # REPL commands
-# /help     - Show help message
-# /tools    - List available tools
-# /clear    - Clear conversation history
-# /exit     - Exit DOOM
+# /help          - Show help message
+# /tools         - List available tools
+# /clear         - Clear conversation history
+# /exit          - Exit DOOM
+# /tools on/off  - Enable/disable tool visualization
+# /parallel on/off - Enable/disable parallel execution
 ```
 
 ## Features
@@ -54,6 +65,7 @@ doom --parallel "Compare the weather in London, New York and Tokyo"
 - 🛠️ Error-resistant JSON parsing with schema validation
 - 📊 Customizable logging
 - 🔍 Parent-child relationship tracking
+- 👁️ Visual tool execution display in CLI
 
 ## Installation
 

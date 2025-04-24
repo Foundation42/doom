@@ -107,6 +107,19 @@ export interface ParallelConfig {
 }
 
 /**
+ * Tool execution event with details
+ */
+export interface ToolExecutionEvent {
+  toolName: string;
+  args: any;
+  result?: string;
+  executionTime?: number;
+  isSubtask?: boolean;
+  parentToolName?: string;
+  error?: string;
+}
+
+/**
  * Options for running the chat, including cancellation and retry settings.
  */
 export interface RunOptions {
@@ -126,4 +139,8 @@ export interface RunOptions {
   logger?: Logger;
   /** Configuration for parallel task execution */
   parallel?: ParallelConfig | boolean;
+  /** Callback for visualizing tool execution */
+  onToolExecution?: (event: ToolExecutionEvent) => void;
+  /** Show tool calls in output (defaults to false) */
+  showToolCalls?: boolean;
 }

@@ -13,9 +13,6 @@
     "build:all": "npm run build && npm run build:cli",
     "lint": "eslint . --ext .ts",
     "test": "jest",
-    "repl": "ts-node examples/repl.ts",
-    "run": "ts-node examples/repl.ts --cmd",
-    "doom:run": "ts-node examples/doom.ts",
     "subtasks": "ts-node examples/subtasks.ts",
     "parallel": "ts-node examples/parallel.ts",
     "tools": "ts-node examples/tools-demo.ts",
@@ -23,7 +20,7 @@
     "tools:advanced": "ts-node examples/tools-demo-advanced.ts",
     "tools:ai": "ts-node examples/advanced-tools-demo.ts",
     "test:ai": "ts-node examples/ai-tools-test.ts",
-    "doom": "ts-node examples/doom.ts"
+    "doom": "ts-node cli/doom.ts"
   },
   "repository": {
     "type": "git",
