@@ -54,7 +54,19 @@ export async function processUserInput(
     content: input
   };
   
-  const currentMessages = [...messages, userMessage];
+  // Filter out system messages that shouldn't be part of the LLM context
+  // Only keep user/assistant messages and the initial system prompt
+  const filteredMessages = messages.filter(msg => 
+    msg.role === 'user' || 
+    msg.role === 'assistant' || 
+    (msg.role === 'system' && msg.content?.includes('You are DOOM'))
+  );
+  
+  // Create the final message array
+  const currentMessages = [...filteredMessages, userMessage];
+  
+  // Log message count for debugging
+  debugLogger.debug(`Sending ${currentMessages.length} messages to LLM (filtered from ${messages.length})`);
   
   // Create AbortController for timeout
   const controller = new AbortController();
@@ -172,6 +184,18 @@ export async function processUserInput(
     };
     
     dispatch({ type: 'ADD_HISTORY_ITEM', item: responseItem });
+    
+    // Also update the message array for the next LLM interaction
+    // Create an assistant message entry
+    const assistantMessage: Message = {
+      role: 'assistant',
+      content: response
+    };
+    
+    // Add the assistant message to the Terminal component's messages state
+    if ((global as any).__updateTerminalMessages) {
+      (global as any).__updateTerminalMessages(assistantMessage);
+    }
     
     // Don't clear tool executions - keep them visible
     // dispatch({ type: 'CLEAR_TOOL_EXECUTIONS' });

@@ -309,6 +309,11 @@ function Terminal({ initialSettings }: { initialSettings?: TerminalSettings }) {
         dispatch({ type: 'UPDATE_INPUT', value: '' });
         
         // Then process with the LLM (this function will add the command to history too)
+        // Set up a global function to update messages with assistant responses
+        (global as any).__updateTerminalMessages = (assistantMessage: Message) => {
+          setMessages(prevMessages => [...prevMessages, assistantMessage]);
+        };
+        
         processUserInput(
           trimmedInput,
           messages,

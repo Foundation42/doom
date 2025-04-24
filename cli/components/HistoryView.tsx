@@ -50,28 +50,40 @@ function getItemLineHeight(item: HistoryItem, width: number): number {
       
     case 'system':
       // System messages can include logos and multi-line text
-      if (item.content.includes('_____    ____    ____') || item.content.includes('DOOM Commands:')) {
-        // Special handling for logo and help text which are large
-        height = 15; // Approximate height for these special messages
+      if (item.content.includes('_____    ____    ____')) {
+        // Logo needs extra space
+        height = 10; 
+      } else if (item.content.includes('DOOM Commands:')) {
+        // Help text is very large
+        height = 25; // Command list is very tall
+      } else if (item.content.includes('💡 Tips:')) {
+        // Tips section also large
+        height = 15;
+      } else if (item.content.includes('📚 Available Tool Categories:')) {
+        // Tool listing is very large
+        height = 30;
       } else {
-        height = getLineCount(item.content, width);
+        // Regular system messages
+        height = getLineCount(item.content, width) + 1;
       }
       break;
       
     case 'error':
       // Error messages are typically a single line
-      height = getLineCount(item.content, width);
+      height = Math.max(1, getLineCount(item.content, width)) + 1;
       break;
       
     case 'tool':
       // Tool messages include the tool call and possibly a result line
       const hasResult = item.content.includes(' → ');
       const hasError = item.content.includes(' - Error: ');
-      height = getLineCount(item.content, width) + (hasResult || hasError ? 1 : 0);
+      // Add extra lines for tool messages to ensure proper spacing
+      height = getLineCount(item.content, width) + (hasResult || hasError ? 2 : 1);
       break;
   }
   
-  return Math.max(1, height);
+  // Add a minimum buffer to all items for better spacing
+  return Math.max(2, height);
 }
 
 /**
@@ -95,22 +107,32 @@ function HistoryView({ history, height }: HistoryViewProps) {
 
   // Calculate which history items to show based on their rendered line height
   const visibleHistory = useMemo(() => {
+    // Add a safety buffer to ensure we don't overflow
+    const safeHeight = Math.max(1, height - 2); // 2 lines of safety buffer
+    
     let totalHeight = 0;
     const result = [];
     
     // Start from the most recent message and work backwards
     for (let i = history.length - 1; i >= 0; i--) {
       const item = history[i];
-      const itemHeight = getItemLineHeight(item, width - 5); // -5 for left padding/margins
+      // Add extra padding for all items to ensure better separation
+      const itemHeight = getItemLineHeight(item, width - 10) + 1; // add 1 line of padding between items
       
       // Stop if adding this item would exceed available height
-      if (totalHeight + itemHeight > height) {
+      // Use a stricter limit to prevent overflow
+      if (totalHeight + itemHeight > safeHeight) {
         break;
       }
       
       // Add item to the start of our result array (to maintain order)
       result.unshift(item);
       totalHeight += itemHeight;
+    }
+    
+    // If we have items, ensure at least one is shown (for very tight spaces)
+    if (result.length === 0 && history.length > 0) {
+      result.push(history[history.length - 1]);
     }
     
     return result;
