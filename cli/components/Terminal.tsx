@@ -1,10 +1,13 @@
-import React, { useReducer, useEffect } from 'react';
+import React, { useReducer, useEffect, useState } from 'react';
 import { Box, useInput, useApp, useStdin } from 'ink';
 import HistoryView from './HistoryView';
 import InputBox from './InputBox';
 import ToolExecutionVisualizer from './ToolExecutionVisualizer';
 import StatusBar from './StatusBar';
 import { initialState, reducer } from '../state/terminalReducer';
+import { createTools, getSystemMessage } from '../utils/tools';
+import { processUserInput } from '../services/chatService';
+import { Message } from '../../src/types';
 
 /**
  * Main Terminal component that contains the entire CLI interface
@@ -19,6 +22,24 @@ function Terminal() {
 
   // Check if raw mode is supported
   const { isRawModeSupported, stdin } = useStdin();
+  
+  // Initialize LLM chat history and tools
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [tools, setTools] = useState<ReturnType<typeof createTools> | null>(null);
+  
+  // Initialize system message and tools
+  useEffect(() => {
+    // Initialize history with system message
+    setMessages([
+      {
+        role: 'system',
+        content: getSystemMessage()
+      }
+    ]);
+    
+    // Initialize tools
+    setTools(createTools());
+  }, []);
   
   // Alternative fallback for input if raw mode is not supported
   useEffect(() => {
@@ -68,7 +89,29 @@ function Terminal() {
     if (key.return) {
       // Submit command on Enter (unless Shift is held for multi-line)
       if (!key.shift) {
+        const trimmedInput = state.inputValue.trim();
         dispatch({ type: 'SUBMIT_COMMAND' });
+        
+        // Process regular commands (not slash commands) with the LLM
+        if (trimmedInput && !trimmedInput.startsWith('/') && tools) {
+          // Process the input with the LLM
+          processUserInput(
+            trimmedInput,
+            messages,
+            tools.allTools,
+            state.parallel,
+            state.showTools,
+            dispatch
+          ).then(result => {
+            // After processing, update the messages state with the new message
+            setMessages(prevMessages => [
+              ...prevMessages,
+              { role: 'user', content: trimmedInput }
+            ]);
+          }).catch(error => {
+            console.error('Error processing input:', error);
+          });
+        }
       } else {
         // Add a new line to input when Shift+Enter is pressed
         dispatch({ type: 'UPDATE_INPUT', value: state.inputValue + '\n' });

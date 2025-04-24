@@ -211,6 +211,34 @@ export function reducer(state: TerminalState, action: TerminalAction): TerminalS
             ],
           };
         }
+        
+        if (command === 'help' || command === '?') {
+          return {
+            ...state,
+            inputValue: '',
+            cursorPosition: 0,
+            history: [
+              ...state.history,
+              { type: 'command', content: trimmedInput },
+              { type: 'system', content: 
+`🔥 DOOM Commands:
+  /exit          - Exit DOOM (if you dare)
+  /help          - Show this help message
+  /tools         - List all available weapons
+  /clear         - Clear the conversation history
+  /parallel on   - Enable parallel tool execution
+  /parallel off  - Disable parallel tool execution
+  /tools on      - Enable tool call visualization
+  /tools off     - Disable tool call visualization
+
+💡 Tips:
+  - Ask questions naturally and DOOM will use weapons appropriately
+  - For AI and LLM tools, provide sufficient text to analyze
+  - Some tools like TTS and LLM tools require API keys in your environment
+  - DOOM never ruins things (that's the whole point)` },
+            ],
+          };
+        }
 
         // For now, just add command to history and clear input
         return {
