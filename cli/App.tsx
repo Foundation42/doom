@@ -13,8 +13,16 @@ export function App() {
  * Run the DOOM CLI application
  */
 export function runApp() {
-  const { waitUntilExit } = render(<App />);
-  return waitUntilExit();
+  // In Ink v5, render returns an unmount function
+  const unmount = render(<App />);
+  
+  // Keep the process running until user exits
+  return new Promise<void>((resolve) => {
+    process.on('SIGINT', () => {
+      unmount();
+      resolve();
+    });
+  });
 }
 
 export default App;

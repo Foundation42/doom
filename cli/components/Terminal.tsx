@@ -1,5 +1,5 @@
 import React, { useReducer, useEffect } from 'react';
-import { Box, useInput, useStdoutDimensions } from 'ink';
+import { Box, useInput, useApp, useStdin } from 'ink';
 import HistoryView from './HistoryView';
 import InputBox from './InputBox';
 import ToolExecutionVisualizer from './ToolExecutionVisualizer';
@@ -11,10 +11,47 @@ import { initialState, reducer } from '../state/terminalReducer';
  */
 function Terminal() {
   const [state, dispatch] = useReducer(reducer, initialState);
-  const { width, height } = useStdoutDimensions();
+  const { stdout } = useApp();
+  
+  // Default dimensions if not available
+  const width = stdout?.columns || process.stdout.columns || 80;
+  const height = stdout?.rows || process.stdout.rows || 24;
 
-  // Handle keyboard input
+  // Check if raw mode is supported
+  const { isRawModeSupported, stdin } = useStdin();
+  
+  // Alternative fallback for input if raw mode is not supported
+  useEffect(() => {
+    if (!isRawModeSupported) {
+      // Create a simple stdin listener instead
+      const handleData = (data: Buffer) => {
+        const input = data.toString();
+        if (input.trim() === '/exit') {
+          process.exit(0);
+        }
+        
+        // For simplicity, just add the input as a command in our history
+        if (input.trim()) {
+          dispatch({ 
+            type: 'ADD_HISTORY_ITEM', 
+            item: { type: 'command', content: input.trim() } 
+          });
+        }
+      };
+      
+      stdin.on('data', handleData);
+      return () => {
+        stdin.off('data', handleData);
+      };
+    }
+  }, [isRawModeSupported]);
+  
+  // Handle keyboard input only if raw mode is supported
   useInput((input, key) => {
+    if (!isRawModeSupported) {
+      return;
+    }
+    
     // Handle special keys
     if (key.escape) {
       // Escape key functionality

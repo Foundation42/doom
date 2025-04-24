@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Text, Spinner } from 'ink';
+import { Box, Text } from 'ink';
 import figures from 'figures';
 import { ToolExecution } from '../types';
 
@@ -50,7 +50,7 @@ function ToolExecutionItem({ execution }: { execution: ToolExecution }) {
   return (
     <Box flexDirection="column" paddingX={1}>
       <Box>
-        {isRunning && <Spinner type="dots" />}
+        {isRunning && <Text color="yellow">{figures.radioOn}</Text>}
         {isSuccess && <Text color="green">{figures.tick}</Text>}
         {isError && <Text color="red">{figures.cross}</Text>}
         
