@@ -1,6 +1,6 @@
 import React from 'react';
 import { render } from 'ink';
-import Terminal from './components/Terminal';
+import Terminal from './components/Terminal.js';
 
 /**
  * Main DOOM application component

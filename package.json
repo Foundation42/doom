@@ -4,6 +4,7 @@
   "description": "The AI agent that *doesn't* ruin everything",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "type": "module",
   "bin": {
     "doom": "./bin/doom.js"
   },
@@ -21,7 +22,9 @@
     "tools:ai": "ts-node examples/advanced-tools-demo.ts",
     "test:ai": "ts-node examples/ai-tools-test.ts",
     "doom": "ts-node cli/doom.ts",
-    "doom:react": "ts-node --project cli/tsconfig.json cli/doom-react.ts"
+    "doom:react": "tsx ./cli/doom-react.ts",
+    "doom:dev": "tsx ./cli/doom-react.ts --verbose", 
+    "test:ink": "tsx ./cli/test-ink.tsx"
   },
   "repository": {
     "type": "git",
@@ -64,7 +67,7 @@
     "@types/minimatch": "^5.1.2",
     "@types/node": "^18.16.0",
     "@types/node-fetch": "^2.6.3",
-    "@types/react": "^18.2.49",
+    "@types/react": "^18.3.20",
     "@types/readline-sync": "^1.4.4",
     "@typescript-eslint/eslint-plugin": "^5.59.1",
     "@typescript-eslint/parser": "^5.59.1",
@@ -74,6 +77,7 @@
     "jest": "^29.5.0",
     "ts-jest": "^29.1.0",
     "ts-node": "^10.9.1",
+    "tsx": "^4.19.3",
     "typescript": "^5.0.4"
   }
 }

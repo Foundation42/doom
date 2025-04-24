@@ -1,13 +1,13 @@
 import React, { useReducer, useEffect, useState } from 'react';
 import { Box, useInput, useApp, useStdin } from 'ink';
-import HistoryView from './HistoryView';
-import InputBox from './InputBox';
-import ToolExecutionVisualizer from './ToolExecutionVisualizer';
-import StatusBar from './StatusBar';
-import { initialState, reducer } from '../state/terminalReducer';
-import { createTools, getSystemMessage } from '../utils/tools';
-import { processUserInput } from '../services/chatService';
-import { Message } from '../../src/types';
+import HistoryView from './HistoryView.js';
+import InputBox from './InputBox.js';
+import ToolExecutionVisualizer from './ToolExecutionVisualizer.js';
+import StatusBar from './StatusBar.js';
+import { initialState, reducer } from '../state/terminalReducer.js';
+import { createTools, getSystemMessage } from '../utils/tools.js';
+import { processUserInput } from '../services/chatService.js';
+import { Message } from '../../src/types.js';
 
 /**
  * Main Terminal component that contains the entire CLI interface

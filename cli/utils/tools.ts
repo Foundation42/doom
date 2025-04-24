@@ -1,8 +1,11 @@
 import path from 'path';
 import fs from 'fs';
 import * as os from 'os';
-import { createStandardTools } from '../../src';
+// Import directly from src files vs using the module export
+// This works around ESM/CJS module compatibility issues
+import { runChatWithTools } from '../../src/chatrunner';
 import { speakTextTool } from '../../src/tools/tts-tools';
+import { createStandardTools } from '../../src/tools/index';
 import { Tool } from '../../src/types';
 import { ToolExecution } from '../types';
 

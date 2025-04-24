@@ -5,9 +5,14 @@
  * Bundles the CLI into a single executable file
  */
 
-const { execSync } = require('child_process');
-const fs = require('fs');
-const path = require('path');
+import { execSync } from 'child_process';
+import * as fs from 'fs';
+import * as path from 'path';
+import { fileURLToPath } from 'url';
+
+// Get the directory name in ESM
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Paths
 const rootDir = path.resolve(__dirname, '..');
@@ -15,7 +20,10 @@ const sourceFile = path.join(rootDir, 'cli', 'doom.ts');
 const outputDir = path.join(rootDir, 'dist', 'cli');
 const outputFile = path.join(outputDir, 'doom-cli.js');
 const binFile = path.join(rootDir, 'bin', 'doom.js');
-const packageJson = require(path.join(rootDir, 'package.json'));
+
+// Read package.json
+const packageJsonPath = path.join(rootDir, 'package.json');
+const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
 
 // Make sure output directory exists
 if (!fs.existsSync(outputDir)) {
@@ -57,14 +65,19 @@ try {
  * This is a bundled version of the DOOM CLI that doesn't require ts-node
  */
 
-const path = require('path');
+import * as path from 'path';
+import { fileURLToPath } from 'url';
+import { spawnSync } from 'child_process';
+
+// Get the directory name in ESM
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Run the bundled version
 const bundledPath = path.resolve(__dirname, '../dist/cli/doom-cli.js');
 
 try {
   // Use spawn to properly handle arguments with spaces
-  const { spawnSync } = require('child_process');
   const result = spawnSync('node', [bundledPath, ...process.argv.slice(2)], { 
     stdio: 'inherit',
     shell: false

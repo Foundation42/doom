@@ -8,7 +8,7 @@ import chalk from 'chalk';
 import fs from 'fs';
 import * as os from 'os';
 import { runApp } from './App';
-import { loadEnvFromDir } from './utils/tools';
+import { loadEnvFromDir } from './utils/tools.js';
 
 // Current version
 const VERSION = '1.0.0';

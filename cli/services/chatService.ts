@@ -1,4 +1,5 @@
-import { runChatWithTools } from '../../src';
+// Import directly from src files vs using the module export
+import { runChatWithTools } from '../../src/chatrunner';
 import { Message, Tool, ToolExecutionEvent } from '../../src/types';
 import { Dispatch } from 'react';
 import { HistoryItem, TerminalAction } from '../state/terminalReducer';
