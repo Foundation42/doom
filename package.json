@@ -23,7 +23,7 @@
     "test:ai": "ts-node examples/ai-tools-test.ts",
     "doom": "ts-node cli/doom.ts",
     "doom:react": "tsx ./cli/doom-react.ts",
-    "doom:dev": "tsx ./cli/doom-react.ts --verbose", 
+    "doom:dev": "tsx ./cli/doom-react.ts --verbose",
     "test:ink": "tsx ./cli/test-ink.tsx"
   },
   "repository": {
@@ -60,6 +60,7 @@
     "openai": "^4.86.1",
     "react": "18.3.1",
     "readline-sync": "^1.4.10",
+    "strip-ansi": "^7.1.0",
     "wrap-ansi": "^9.0.0"
   },
   "devDependencies": {
