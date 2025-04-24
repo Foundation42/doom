@@ -212,3 +212,63 @@ export function convertToolExecutionToState(
     parentToolId
   };
 }
+
+/**
+ * List tools by category and return formatted output
+ * @param tools List of available tools
+ * @returns Formatted string of tools grouped by category
+ */
+export function listToolsByCategory(tools: Tool[]): string {
+  // Group tools by category
+  const categories: Record<string, Tool[]> = {};
+
+  // Extract category from tool name (category is everything before the first uppercase letter)
+  tools.forEach(tool => {
+    let category = '';
+    
+    // For our standard tools, they're typically camelCase with the category as prefix
+    // E.g., httpFetchTool, fileReadTool, etc.
+    if (tool.name.match(/^[a-z]+[A-Z]/)) {
+      category = tool.name.match(/^([a-z]+)[A-Z]/)?.[1] || 'other';
+    } else {
+      category = 'custom';
+    }
+    
+    // Correct some special categories
+    if (['analyze', 'extract', 'classify', 'summarize', 'translate'].some(prefix => 
+      tool.name.startsWith(prefix))) {
+      category = 'ai';
+    }
+    if (['speak', 'narrate', 'expressive'].some(prefix => tool.name.startsWith(prefix))) {
+      category = 'tts';
+    }
+    if (['chain', 'multi', 'adaptive', 'transform', 'compare'].some(prefix => 
+      tool.name.startsWith(prefix))) {
+      category = 'llm';
+    }
+    
+    // Always capitalize first letter
+    category = category.charAt(0).toUpperCase() + category.slice(1);
+    
+    if (!categories[category]) {
+      categories[category] = [];
+    }
+    categories[category].push(tool);
+  });
+  
+  // Build the formatted output
+  let output = '📚 Available Tool Categories:\n\n';
+  
+  // Print categories and tools
+  Object.entries(categories).forEach(([category, categoryTools]) => {
+    output += `  ${category} (${categoryTools.length}):\n`;
+    categoryTools.forEach(tool => {
+      output += `    ${tool.name} - ${tool.description}\n`;
+    });
+    output += '\n';
+  });
+  
+  output += 'Type "/help" for usage instructions or "/exit" to quit.\n';
+  
+  return output;
+}

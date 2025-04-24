@@ -1,5 +1,5 @@
 import React, { useReducer, useEffect, useState } from 'react';
-import { Box, useInput, useApp, useStdin } from 'ink';
+import { Box, useInput, useApp, useStdin, Text } from 'ink';
 import HistoryView from './HistoryView.js';
 import InputBox from './InputBox.js';
 import ToolExecutionVisualizer from './ToolExecutionVisualizer.js';
@@ -8,12 +8,21 @@ import { initialState, reducer } from '../state/terminalReducer.js';
 import { createTools, getSystemMessage } from '../utils/tools.js';
 import { processUserInput } from '../services/chatService.js';
 import { Message } from '../../src/types.js';
+import { DOOM_LOGO, DOOM_BANNER } from '../utils/constants.js';
+import { TerminalSettings } from '../App.js';
 
 /**
  * Main Terminal component that contains the entire CLI interface
  */
-function Terminal() {
-  const [state, dispatch] = useReducer(reducer, initialState);
+function Terminal({ initialSettings }: { initialSettings?: TerminalSettings }) {
+  // Initialize with CLI arguments if provided
+  const actualInitialState = {
+    ...initialState,
+    parallel: initialSettings?.parallel ?? initialState.parallel,
+    showTools: initialSettings?.showTools ?? initialState.showTools
+  };
+  
+  const [state, dispatch] = useReducer(reducer, actualInitialState);
   const { stdout } = useApp();
   
   // Default dimensions if not available
@@ -22,6 +31,9 @@ function Terminal() {
 
   // Check if raw mode is supported
   const { isRawModeSupported, stdin } = useStdin();
+  
+  // Debug raw mode support - disabled
+  // console.error('Terminal component - isRawModeSupported:', isRawModeSupported);
   
   // Initialize LLM chat history and tools
   const [messages, setMessages] = useState<Message[]>([]);
@@ -38,26 +50,143 @@ function Terminal() {
     ]);
     
     // Initialize tools
-    setTools(createTools());
+    const toolsData = createTools();
+    setTools(toolsData);
+    
+    // Display startup banner
+    dispatch({ type: 'ADD_HISTORY_ITEM', item: { type: 'system', content: DOOM_LOGO, timestamp: new Date() } });
+    dispatch({ type: 'ADD_HISTORY_ITEM', item: { type: 'system', content: DOOM_BANNER, timestamp: new Date() } });
+    
+    // Display tool count
+    const welcomeMessage = `🔥 Armed with ${toolsData.allTools.length} tools (${toolsData.standardTools.length} standard + ${toolsData.customTools.length} custom)`;
+    dispatch({ type: 'ADD_HISTORY_ITEM', item: { type: 'system', content: welcomeMessage, timestamp: new Date() } });
+    dispatch({ type: 'ADD_HISTORY_ITEM', item: { type: 'system', content: 'Type "/tools" to see available weapons, "/help" for commands, or "/exit" to quit.', timestamp: new Date() } });
+    
+    // Set up periodic cleanup of tool executions (every 5 minutes)
+    const cleanupInterval = setInterval(() => {
+      // Only keep recent tool executions (last 50)
+      if (state.toolExecutions.length > 50) {
+        dispatch({ type: 'PRUNE_TOOL_EXECUTIONS', maxCount: 50 });
+      }
+    }, 5 * 60 * 1000); // 5 minutes
+    
+    return () => {
+      clearInterval(cleanupInterval);
+    };
   }, []);
   
   // Alternative fallback for input if raw mode is not supported
   useEffect(() => {
     if (!isRawModeSupported) {
+      let buffer = '';
+      let multilineMode = false;
+      
       // Create a simple stdin listener instead
       const handleData = (data: Buffer) => {
         const input = data.toString();
-        if (input.trim() === '/exit') {
-          process.exit(0);
+        
+        // Check for special key inputs
+        if (input === '\u0003') { // Ctrl+C
+          if ((global as any).doomExit) {
+            (global as any).doomExit();
+          } else {
+            process.exit(0);
+          }
+          return;
         }
         
-        // For simplicity, just add the input as a command in our history
-        if (input.trim()) {
-          dispatch({ 
-            type: 'ADD_HISTORY_ITEM', 
-            item: { type: 'command', content: input.trim() } 
-          });
+        // Check for Enter key to submit (but not in multiline mode)
+        if (input === '\n' || input === '\r' || input === '\r\n') {
+          if (multilineMode) {
+            // In multiline mode, add a newline to the buffer
+            buffer += '\n';
+            process.stdout.write('\n> '); // Show continuation prompt
+            return;
+          }
+          
+          // Process the complete input
+          const finalInput = buffer.trim();
+          buffer = ''; // Reset buffer
+          
+          if (!finalInput) return;
+          
+          // Handle exit command directly
+          if (finalInput === '/exit') {
+            if ((global as any).doomExit) {
+              (global as any).doomExit();
+            } else {
+              process.exit(0);
+            }
+            return;
+          }
+          
+          // Process slash commands through the reducer
+          if (finalInput.startsWith('/')) {
+            dispatch({ type: 'SUBMIT_COMMAND', rawInput: finalInput });
+            return;
+          }
+          
+          // For non-slash commands, we'll use dispatch({ type: 'SUBMIT_COMMAND' }) first to clear input
+          // Then we let processUserInput handle adding to history
+          dispatch({ type: 'SUBMIT_COMMAND', rawInput: finalInput });
+          
+          // Defensive: forcibly reset input after submit
+          dispatch({ type: 'UPDATE_INPUT', value: '' });
+          
+          // Process regular input with the LLM if tools are loaded
+          if (tools) {
+            // Set mode to thinking
+            dispatch({ type: 'SET_MODE', mode: 'thinking' });
+            
+            // Process with LLM
+            processUserInput(
+              finalInput,
+              messages,
+              tools.allTools,
+              state.parallel,
+              state.showTools,
+              dispatch
+            ).then(result => {
+              // Update messages state
+              setMessages(prevMessages => [
+                ...prevMessages,
+                { role: 'user', content: finalInput }
+              ]);
+            }).catch(error => {
+              console.error('Error processing input:', error);
+              // Add error message to history
+              dispatch({ 
+                type: 'ADD_HISTORY_ITEM', 
+                item: {
+                  type: 'error',
+                  content: `Error processing input: ${error instanceof Error ? error.message : String(error)}`,
+                  timestamp: new Date()
+                }
+              });
+            });
+          }
+          return;
         }
+        
+        // Toggle multiline mode with Shift+Enter (usually comes as a specific key code)
+        if (input === '\u001b[13;2u' || input === '\u001b[13;2~') {
+          multilineMode = !multilineMode;
+          process.stdout.write(multilineMode ? '\n[Multiline mode - press Enter twice to submit]\n> ' : '\n');
+          return;
+        }
+        
+        // For backspace/delete
+        if (input === '\b' || input === '\x7f') {
+          if (buffer.length > 0) {
+            buffer = buffer.slice(0, -1);
+            process.stdout.write('\b \b'); // Erase last character
+          }
+          return;
+        }
+        
+        // For all other inputs, add to buffer and echo
+        buffer += input;
+        process.stdout.write(input); // Echo the input
       };
       
       stdin.on('data', handleData);
@@ -65,61 +194,152 @@ function Terminal() {
         stdin.off('data', handleData);
       };
     }
-  }, [isRawModeSupported]);
+  }, [isRawModeSupported, tools, messages, state.parallel, state.showTools]);
   
   // Handle keyboard input only if raw mode is supported
   useInput((input, key) => {
+    // Only log if in debug mode
+    if (false) {
+      console.error(`[useInput] key event - raw input: "${input}"` + 
+        ` (${Array.from(input).map(c => c.charCodeAt(0)).join(',')})` +
+        `, key object: ${JSON.stringify(key)}`);
+    }
+    
     if (!isRawModeSupported) {
       return;
     }
     
-    // Handle special keys
+    // Handle special keys first - this order matters!
+    
+    // Escape key functionality
     if (key.escape) {
-      // Escape key functionality
       dispatch({ type: 'CANCEL_COMPLETION' });
       return;
     }
 
+    // Backspace key - try all possible ways a terminal might report backspace
+    if (key.backspace || key.name === 'backspace' || input === '\b' || input === '\x7f' || input === '\u007f') {
+      dispatch({ type: 'BACKSPACE' });
+      return;
+    }
+    
+    // Delete key - in some terminals/environments backspace can be reported as delete
+    if (key.delete) {
+      // Use the backspace action instead of delete since that's what the user expects
+      dispatch({ type: 'BACKSPACE' });
+      return;
+    }
+    
+    // Tab for completions
     if (key.tab) {
-      // Tab completion
-      dispatch({ type: 'CYCLE_COMPLETION', direction: key.shift ? -1 : 1 });
+      // If completions are already showing, cycle through them
+      if (state.isCompletionVisible && state.completions.length > 0) {
+        dispatch({ type: 'CYCLE_COMPLETION', direction: key.shift ? -1 : 1 });
+        return;
+      }
+      
+      // Otherwise, generate completions based on current input
+      const currentInput = state.inputValue;
+      
+      // Command completions (if input starts with /)
+      if (currentInput.startsWith('/')) {
+        const slashCommands = [
+          '/help', '/exit', '/clear', '/tools', '/history',
+          '/tools on', '/tools off', 
+          '/parallel on', '/parallel off'
+        ];
+        
+        // Find commands that match the current input
+        const matchingCommands = slashCommands.filter(cmd => 
+          cmd.startsWith(currentInput) && cmd !== currentInput
+        );
+        
+        if (matchingCommands.length > 0) {
+          dispatch({ type: 'SHOW_COMPLETIONS', completions: matchingCommands });
+          return;
+        }
+      }
+      
+      // Tool name completions if tools are loaded
+      if (tools && currentInput.length > 0 && !currentInput.includes(' ')) {
+        const toolNames = tools.allTools.map(tool => tool.name);
+        const matchingTools = toolNames.filter(name => 
+          name.toLowerCase().startsWith(currentInput.toLowerCase()) && 
+          name.toLowerCase() !== currentInput.toLowerCase()
+        );
+        
+        if (matchingTools.length > 0) {
+          dispatch({ type: 'SHOW_COMPLETIONS', completions: matchingTools });
+          return;
+        }
+      }
+      
       return;
     }
 
-    if (key.return) {
-      // Submit command on Enter (unless Shift is held for multi-line)
-      if (!key.shift) {
-        const trimmedInput = state.inputValue.trim();
+    // Enter key
+    if (key.return) {    
+      // If a completion is selected, use it
+      if (state.isCompletionVisible && state.completions.length > 0) {
+        const selectedCompletion = state.completions[state.selectedCompletionIndex];
+        dispatch({ 
+          type: 'UPDATE_INPUT', 
+          value: selectedCompletion,
+          setCursor: selectedCompletion.length
+        });
+        dispatch({ type: 'HIDE_COMPLETIONS' });
+        return;
+      }
+            
+      // Submit command on Enter (always handle as normal Enter for now)
+      const trimmedInput = state.inputValue.trim();
+      
+      // For regular commands (not slash commands), handle differently
+      if (trimmedInput && !trimmedInput.startsWith('/') && tools) {
+        // First, clear the input (SUBMIT_COMMAND clears input)
         dispatch({ type: 'SUBMIT_COMMAND' });
         
-        // Process regular commands (not slash commands) with the LLM
-        if (trimmedInput && !trimmedInput.startsWith('/') && tools) {
-          // Process the input with the LLM
-          processUserInput(
-            trimmedInput,
-            messages,
-            tools.allTools,
-            state.parallel,
-            state.showTools,
-            dispatch
-          ).then(result => {
-            // After processing, update the messages state with the new message
-            setMessages(prevMessages => [
-              ...prevMessages,
-              { role: 'user', content: trimmedInput }
-            ]);
-          }).catch(error => {
-            console.error('Error processing input:', error);
+        // Defensive: forcibly reset input after submit
+        dispatch({ type: 'UPDATE_INPUT', value: '' });
+        
+        // Then process with the LLM (this function will add the command to history too)
+        processUserInput(
+          trimmedInput,
+          messages,
+          tools.allTools,
+          state.parallel,
+          state.showTools,
+          dispatch
+        ).then(result => {
+          // After processing, update the messages state with the new message
+          setMessages(prevMessages => [
+            ...prevMessages,
+            { role: 'user', content: trimmedInput }
+          ]);
+        }).catch(error => {
+          console.error('Error processing input:', error);
+          // Add error message to history
+          dispatch({ 
+            type: 'ADD_HISTORY_ITEM', 
+            item: {
+              type: 'error',
+              content: `Error processing input: ${error instanceof Error ? error.message : String(error)}`,
+              timestamp: new Date()
+            }
           });
-        }
-      } else {
-        // Add a new line to input when Shift+Enter is pressed
-        dispatch({ type: 'UPDATE_INPUT', value: state.inputValue + '\n' });
+        });
+      } else if (trimmedInput) {
+        // For slash commands or empty input, just use the reducer
+        dispatch({ type: 'SUBMIT_COMMAND' });
+        
+        // Defensive: forcibly reset input after submit
+        dispatch({ type: 'UPDATE_INPUT', value: '' });
       }
+      
       return;
     }
 
-    // History navigation with up/down arrows
+    // Arrow keys navigation
     if (key.upArrow) {
       dispatch({ type: 'NAVIGATE_HISTORY', direction: -1 });
       return;
@@ -130,7 +350,6 @@ function Terminal() {
       return;
     }
 
-    // Cursor movement with left/right arrows
     if (key.leftArrow) {
       dispatch({ type: 'MOVE_CURSOR', direction: -1 });
       return;
@@ -141,38 +360,38 @@ function Terminal() {
       return;
     }
 
-    // Home key moves cursor to start of line
+    // Home/End keys
     if (key.home) {
       dispatch({ type: 'CURSOR_LINE_START' });
       return;
     }
 
-    // End key moves cursor to end of line
     if (key.end) {
       dispatch({ type: 'CURSOR_LINE_END' });
       return;
     }
 
-    // Backspace and delete key functionality
-    if (key.backspace) {
-      dispatch({ type: 'BACKSPACE' });
-      return;
-    }
-
-    if (key.delete) {
-      dispatch({ type: 'DELETE' });
-      return;
-    }
-
     // Ctrl+C exits the application
     if (key.ctrl && input === 'c') {
-      process.exit(0);
+      // Use the cleaner exit function if it exists
+      if ((global as any).doomExit) {
+        (global as any).doomExit();
+      } else {
+        // Fallback to process.exit
+        process.exit(0);
+      }
+      return;
     }
-
-    // For all other inputs, update the input value if it's a printable character
-    if (input && !key.ctrl && !key.meta && !key.shift) {
-      dispatch({ type: 'UPDATE_INPUT', value: state.inputValue.substring(0, state.cursorPosition) + input + state.inputValue.substring(state.cursorPosition) });
+    
+    // Handle all printable characters (including space, slash, etc.)
+    // Allow all input unless ctrl or meta is pressed
+    if (input && !key.ctrl && !key.meta) {
+      dispatch({ 
+        type: 'UPDATE_INPUT', 
+        value: state.inputValue.substring(0, state.cursorPosition) + input + state.inputValue.substring(state.cursorPosition) 
+      });
       dispatch({ type: 'MOVE_CURSOR', direction: input.length });
+      return;
     }
   });
 

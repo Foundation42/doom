@@ -1,4 +1,5 @@
 import { HistoryItem, ToolExecution } from '../types';
+import { createTools, listToolsByCategory } from '../utils/tools';
 
 /**
  * Terminal state
@@ -32,13 +33,13 @@ export interface TerminalState {
  * Actions for the terminal reducer
  */
 export type TerminalAction =
-  | { type: 'UPDATE_INPUT'; value: string }
+  | { type: 'UPDATE_INPUT'; value: string; setCursor?: number }
   | { type: 'MOVE_CURSOR'; direction: number }
   | { type: 'CURSOR_LINE_START' }
   | { type: 'CURSOR_LINE_END' }
   | { type: 'BACKSPACE' }
   | { type: 'DELETE' }
-  | { type: 'SUBMIT_COMMAND' }
+  | { type: 'SUBMIT_COMMAND'; rawInput?: string }
   | { type: 'ADD_HISTORY_ITEM'; item: HistoryItem }
   | { type: 'NAVIGATE_HISTORY'; direction: number }
   | { type: 'SHOW_COMPLETIONS'; completions: string[] }
@@ -48,6 +49,7 @@ export type TerminalAction =
   | { type: 'ADD_TOOL_EXECUTION'; execution: ToolExecution }
   | { type: 'UPDATE_TOOL_EXECUTION'; execution: ToolExecution }
   | { type: 'CLEAR_TOOL_EXECUTIONS' }
+  | { type: 'PRUNE_TOOL_EXECUTIONS'; maxCount: number }
   | { type: 'SET_MODE'; mode: 'command' | 'input' | 'thinking' }
   | { type: 'TOGGLE_PARALLEL' }
   | { type: 'TOGGLE_SHOW_TOOLS' };
@@ -91,7 +93,10 @@ export function reducer(state: TerminalState, action: TerminalAction): TerminalS
       return {
         ...state,
         inputValue: action.value,
-        cursorPosition: state.cursorPosition + (action.value.length - state.inputValue.length),
+        // If setCursor is provided, use it directly, otherwise calculate cursor position
+        cursorPosition: action.setCursor !== undefined 
+          ? action.setCursor 
+          : state.cursorPosition + (action.value.length - state.inputValue.length),
       };
       
     case 'MOVE_CURSOR':
@@ -117,13 +122,20 @@ export function reducer(state: TerminalState, action: TerminalAction): TerminalS
       };
     }
     
-    case 'BACKSPACE':
-      if (state.cursorPosition === 0) return state;
+    case 'BACKSPACE': {
+      if (state.cursorPosition === 0) {
+        return state;
+      }
+      
+      const backspaceValue = state.inputValue.substring(0, state.cursorPosition - 1) + state.inputValue.substring(state.cursorPosition);
+      const backspacePosition = state.cursorPosition - 1;
+      
       return {
         ...state,
-        inputValue: state.inputValue.substring(0, state.cursorPosition - 1) + state.inputValue.substring(state.cursorPosition),
-        cursorPosition: state.cursorPosition - 1,
+        inputValue: backspaceValue,
+        cursorPosition: backspacePosition,
       };
+    }
       
     case 'DELETE':
       if (state.cursorPosition >= state.inputValue.length) return state;
@@ -133,10 +145,9 @@ export function reducer(state: TerminalState, action: TerminalAction): TerminalS
       };
       
     case 'SUBMIT_COMMAND':
-      if (!state.inputValue.trim()) return state;
-      
-      // Check for slash commands
-      const trimmedInput = state.inputValue.trim();
+      // Get input either from raw input (fallback mode) or state
+      const trimmedInput = action.rawInput?.trim() || state.inputValue.trim();
+      if (!trimmedInput) return state;
       
       // Handle slash commands
       if (trimmedInput.startsWith('/')) {
@@ -144,7 +155,14 @@ export function reducer(state: TerminalState, action: TerminalAction): TerminalS
         const command = trimmedInput.substring(1).toLowerCase();
         
         if (command === 'exit') {
-          process.exit(0);
+          // Use the cleaner exit function if it exists
+          if ((global as any).doomExit) {
+            (global as any).doomExit();
+          } else {
+            // Fallback to process.exit
+            process.exit(0);
+          }
+          return state; // This will be ignored after exit
         }
         
         if (command === 'clear') {
@@ -226,6 +244,7 @@ export function reducer(state: TerminalState, action: TerminalAction): TerminalS
   /help          - Show this help message
   /tools         - List all available weapons
   /clear         - Clear the conversation history
+  /history       - Show conversation history for export
   /parallel on   - Enable parallel tool execution
   /parallel off  - Disable parallel tool execution
   /tools on      - Enable tool call visualization
@@ -235,7 +254,55 @@ export function reducer(state: TerminalState, action: TerminalAction): TerminalS
   - Ask questions naturally and DOOM will use weapons appropriately
   - For AI and LLM tools, provide sufficient text to analyze
   - Some tools like TTS and LLM tools require API keys in your environment
-  - DOOM never ruins things (that's the whole point)` },
+  - DOOM never ruins things (that's the whole point)
+  
+📋 Examples:
+  - "What's the weather in Tokyo?"
+  - "Calculate a 18% tip on a $45.50 bill"
+  - "Summarize this article: [paste text here]"
+  - "Translate this to Spanish: Hello, how are you?"
+  - "Who are you and what weapons do you have?"` },
+            ],
+          };
+        }
+        
+        if (command === 'tools') {
+          // List available tools grouped by category
+          const { allTools } = createTools();
+          const toolsOutput = listToolsByCategory(allTools);
+          
+          return {
+            ...state,
+            inputValue: '',
+            cursorPosition: 0,
+            history: [
+              ...state.history,
+              { type: 'command', content: trimmedInput },
+              { type: 'system', content: toolsOutput },
+            ],
+          };
+        }
+        
+        if (command === 'history') {
+          // Format conversation history for display/export
+          const conversationHistory = state.history
+            .filter(item => item.type === 'command' || item.type === 'response')
+            .map((item, index) => {
+              const role = item.type === 'command' ? 'User' : 'DOOM';
+              return `${role}: ${item.content}`;
+            })
+            .join('\n\n');
+          
+          const historyOutput = `📜 Conversation History:\n\n${conversationHistory || 'No conversation history yet.'}`;
+          
+          return {
+            ...state,
+            inputValue: '',
+            cursorPosition: 0,
+            history: [
+              ...state.history,
+              { type: 'command', content: trimmedInput },
+              { type: 'system', content: historyOutput },
             ],
           };
         }
@@ -254,11 +321,12 @@ export function reducer(state: TerminalState, action: TerminalAction): TerminalS
       }
       
       // Regular command (not a slash command)
+      // For regular commands, we'll let the LLM handler add the command to history
+      // This ensures commands and responses are paired together
       return {
         ...state,
         inputValue: '',
         cursorPosition: 0,
-        history: [...state.history, { type: 'command', content: trimmedInput }],
         mode: 'thinking',
       };
       
@@ -285,17 +353,25 @@ export function reducer(state: TerminalState, action: TerminalAction): TerminalS
           historyIndex: -1,
           inputValue: '',
           cursorPosition: 0,
+          isCompletionVisible: false,
         };
       }
       
       // Cap at oldest command
       newIndex = Math.min(newIndex, commandHistory.length - 1);
       
+      // Get the selected command
+      const selectedCommand = newIndex >= 0 
+        ? commandHistory[commandHistory.length - 1 - newIndex] 
+        : '';
+      
       return {
         ...state,
         historyIndex: newIndex,
-        inputValue: newIndex >= 0 ? commandHistory[commandHistory.length - 1 - newIndex] : '',
-        cursorPosition: newIndex >= 0 ? commandHistory[commandHistory.length - 1 - newIndex].length : 0,
+        inputValue: selectedCommand,
+        cursorPosition: selectedCommand.length,
+        // Hide completions when navigating history
+        isCompletionVisible: false,
       };
       
     case 'SHOW_COMPLETIONS':
@@ -345,6 +421,16 @@ export function reducer(state: TerminalState, action: TerminalAction): TerminalS
       return {
         ...state,
         toolExecutions: [],
+      };
+      
+    case 'PRUNE_TOOL_EXECUTIONS':
+      // Keep only the most recent executions up to maxCount
+      const { maxCount } = action;
+      return {
+        ...state,
+        toolExecutions: state.toolExecutions.length > maxCount
+          ? state.toolExecutions.slice(-maxCount) // Take the last 'maxCount' items
+          : state.toolExecutions,
       };
       
     case 'SET_MODE':

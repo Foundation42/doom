@@ -37,7 +37,17 @@ export async function processUserInput(
   // Set mode to thinking
   dispatch({ type: 'SET_MODE', mode: 'thinking' });
   
-  // Add user message to history
+  // Add user message to history first - this ensures the command is displayed
+  dispatch({ 
+    type: 'ADD_HISTORY_ITEM', 
+    item: {
+      type: 'command',
+      content: input,
+      timestamp: new Date()
+    }
+  });
+  
+  // Add user message to messages for LLM context
   const userMessage: Message = {
     role: 'user',
     content: input
@@ -76,6 +86,9 @@ export async function processUserInput(
       }
     };
     
+    // Add debug log
+    console.log('📝 Processing input with LLM:', input);
+    
     // Run chat with tools
     const response = await runChatWithTools(currentMessages, tools, {
       signal: controller.signal,
@@ -87,6 +100,9 @@ export async function processUserInput(
       onToolExecution: showTools ? handleToolExecution : undefined,
       showToolCalls: showTools // This needs to be true to emit tool execution events
     });
+    
+    // Add debug log
+    console.log('📝 Received LLM response');
     
     // Add assistant response to history
     const responseItem: HistoryItem = {

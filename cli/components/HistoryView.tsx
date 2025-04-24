@@ -14,23 +14,12 @@ interface HistoryViewProps {
  * HistoryView component displays command history and responses
  */
 function HistoryView({ history, height }: HistoryViewProps) {
-  // If there's no history, show a welcome message
+  // If there's no history, show a waiting message (logo will be shown via the dispatch in Terminal)
   if (history.length === 0) {
     return (
       <Box flexDirection="column" height={height} overflowY="hidden">
-        <Text color="red" bold>
-          {`  _____    ____    ____    __  __ 
- |  __ \\  / __ \\  / __ \\  |  \\/  |
- | |  | || |  | || |  | | | \\  / |
- | |  | || |  | || |  | | | |\\/| |
- | |__| || |__| || |__| | | |  | |
- |_____/  \\____/  \\____/  |_|  |_|`}
-        </Text>
         <Box marginY={1}>
-          <Text color="yellow">The AI agent that *doesn't* ruin everything.</Text>
-        </Box>
-        <Box marginY={1}>
-          <Text color="gray">Type /help for usage instructions or /exit to quit.</Text>
+          <Text color="gray">Initializing DOOM...</Text>
         </Box>
       </Box>
     );
@@ -78,6 +67,16 @@ function HistoryItemView({ item }: { item: HistoryItem }) {
       );
       
     case 'system':
+      // Special handling for logo and banner - no modifications needed as they are pre-formatted
+      if (item.content.includes('_____    ____    ____') || item.content.includes('DOOM (v1.0)')) {
+        return (
+          <Box>
+            <Text color="red">{item.content}</Text>
+          </Box>
+        );
+      }
+      
+      // Regular system messages
       return (
         <Box>
           <Text color="yellow">{item.content}</Text>

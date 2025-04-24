@@ -28,16 +28,25 @@ function InputBox({
   const cursorChar = inputValue.charAt(cursorPosition) || ' ';
   const textAfterCursor = inputValue.substring(cursorPosition + 1);
 
+  // Sanitize input value to detect and handle multiline properly
+  const sanitizedInput = inputValue || '';
+  
   // Get the current line for multi-line inputs
   const currentLineNumber = (textBeforeCursor.match(/\n/g) || []).length + 1;
-  const totalLines = (inputValue.match(/\n/g) || []).length + 1;
+  const totalLines = (sanitizedInput.match(/\n/g) || []).length + 1;
 
   // Split input at cursor position for better display in multi-line inputs
-  const lines = inputValue.split('\n');
+  const lines = sanitizedInput.split('\n');
   const currentLine = currentLineNumber <= lines.length ? lines[currentLineNumber - 1] : '';
 
-  // Render the input prompt based on whether it's a multi-line input
-  const prompt = totalLines > 1 
+  // For debugging
+  console.log(`InputBox render - totalLines: ${totalLines}, inputValue: "${sanitizedInput}"`);
+  
+  // Determine if we're truly in multiline mode (having actual content with newlines)
+  const isActuallyMultiline = totalLines > 1 && sanitizedInput.trim() !== '';
+  
+  // Render the input prompt
+  const prompt = isActuallyMultiline
     ? chalk.cyan(`${figures.arrowRight} (${currentLineNumber}/${totalLines})`) 
     : chalk.cyan(figures.arrowRight);
 
