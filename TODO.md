@@ -74,18 +74,35 @@ This document outlines planned enhancements and improvements for the DOOM librar
 
 ## CLI & User Experience
 
-- [ ] **Enhanced CLI Interface**
-  - [ ] Implement full arrow key history navigation
-  - [ ] Add command-line editing with cursor movement
-  - [ ] Support for command completion
+- [x] **Enhanced CLI Interface**
+  - [x] Implement full arrow key history navigation with Up/Down keys
+  - [x] Add command-line editing with cursor movement
+  - [x] Support for tab-based command completion for slash commands
   - [ ] Add color themes and customization options
   - [x] Display tool calls visually with arguments and results
+
+- [x] **Claude Code-Inspired Improvements**
+  - [x] Implement proper input box with multi-line support
+  - [x] Add terminal/command history display
+  - [x] Support for cursor-based navigation and editing within multi-line messages
+  - [x] Add tab completion for commands and file paths
+  - [x] Implement thinking/progress indicator during tool execution
+  - [x] Create expanded tool visualization similar to Claude Code
 
 - [ ] **REPL Improvements**
   - [ ] Save and load conversation sessions
   - [ ] Export conversations to markdown or other formats
-  - [ ] Add multi-line input support
-  - [ ] Implement proper terminal UI with panels and views
+  - [x] Add multi-line input support with proper editor-like experience 
+  - [x] Implement proper terminal UI with panels and views for better layout
+
+- [ ] **React-based CLI Enhancements**
+  - [x] Fix tool execution tracking to properly handle start/completion events
+  - [ ] Improve error handling for raw mode compatibility
+  - [ ] Add persistent command history across sessions
+  - [ ] Support image display in the terminal
+  - [ ] Implement splash screen and help command
+  - [ ] Add keyboard shortcuts for common operations (Ctrl+C, Ctrl+L, etc.)
+  - [ ] Create custom themes and styling options
 
 ## Documentation & Examples
 

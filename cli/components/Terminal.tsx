@@ -4,6 +4,7 @@ import HistoryView from './HistoryView.js';
 import InputBox from './InputBox.js';
 import ToolExecutionVisualizer from './ToolExecutionVisualizer.js';
 import StatusBar from './StatusBar.js';
+import DebugPanel, { debugLogger } from './DebugPanel.js';
 import { initialState, reducer } from '../state/terminalReducer.js';
 import { createTools, getSystemMessage } from '../utils/tools.js';
 import { processUserInput } from '../services/chatService.js';
@@ -39,8 +40,13 @@ function Terminal({ initialSettings }: { initialSettings?: TerminalSettings }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [tools, setTools] = useState<ReturnType<typeof createTools> | null>(null);
   
+  
   // Initialize system message and tools
   useEffect(() => {
+    // Add a debug log for initialization to ensure debug panel has content
+    debugLogger.info('Terminal initialized');
+    debugLogger.debug('Setting up system message and tools');
+    
     // Initialize history with system message
     setMessages([
       {
@@ -395,15 +401,19 @@ function Terminal({ initialSettings }: { initialSettings?: TerminalSettings }) {
     }
   });
 
+  // Define a fixed size for the debug panel
+  const DEBUG_PANEL_HEIGHT = 20;
+  
   return (
     <Box flexDirection="column" height={height}>
+      {state.debugMode && (
+        <DebugPanel visible={true} maxHeight={DEBUG_PANEL_HEIGHT} />
+      )}
       <HistoryView 
         history={state.history} 
-        height={height - 4} 
+        height={height - (state.debugMode ? DEBUG_PANEL_HEIGHT + 4 : 4)} 
       />
-      <ToolExecutionVisualizer 
-        executions={state.toolExecutions} 
-      />
+      {/* Tool visualization is now shown inline in the history instead of as a separate component */}
       <InputBox
         inputValue={state.inputValue}
         cursorPosition={state.cursorPosition}
@@ -416,6 +426,7 @@ function Terminal({ initialSettings }: { initialSettings?: TerminalSettings }) {
         mode={state.mode}
         parallel={state.parallel}
         showTools={state.showTools}
+        debugMode={state.debugMode}
       />
     </Box>
   );

@@ -36,4 +36,6 @@ export const SLASH_COMMANDS = [
   '/tools off',
   '/parallel on',
   '/parallel off',
+  '/debug on',
+  '/debug off',
 ];

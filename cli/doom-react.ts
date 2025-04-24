@@ -235,8 +235,9 @@ async function runSingleCommand(command: string, useParallel: boolean = false, s
       timeoutMs: 55000,
       maxRetries: 2,
       parallel: useParallel,
-      onToolExecution: showToolCalls ? handleToolExecution : undefined,
-      showToolCalls: showToolCalls // This needs to be true to emit tool execution events
+      // Always attach the handler to collect tool executions, regardless of display setting
+      onToolExecution: handleToolExecution,
+      showToolCalls: true // Always set to true to emit tool execution events
     });
 
     clearTimeout(timeoutId);

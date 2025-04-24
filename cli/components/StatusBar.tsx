@@ -6,12 +6,13 @@ interface StatusBarProps {
   mode: 'command' | 'input' | 'thinking';
   parallel: boolean;
   showTools: boolean;
+  debugMode: boolean;
 }
 
 /**
  * StatusBar component shows the current state and available shortcuts
  */
-function StatusBar({ mode, parallel, showTools }: StatusBarProps) {
+function StatusBar({ mode, parallel, showTools, debugMode }: StatusBarProps) {
   return (
     <Box justifyContent="space-between" borderStyle="single" borderColor="gray">
       <Box>
@@ -21,8 +22,11 @@ function StatusBar({ mode, parallel, showTools }: StatusBarProps) {
         <Box marginRight={2}>
           <Text>Parallel: {parallel ? <Text color="green">{figures.tick}</Text> : <Text color="red">{figures.cross}</Text>}</Text>
         </Box>
-        <Box>
+        <Box marginRight={2}>
           <Text>Tools: {showTools ? <Text color="green">{figures.tick}</Text> : <Text color="red">{figures.cross}</Text>}</Text>
+        </Box>
+        <Box>
+          <Text>Debug: {debugMode ? <Text color="green">{figures.tick}</Text> : <Text color="red">{figures.cross}</Text>}</Text>
         </Box>
       </Box>
       <Box>

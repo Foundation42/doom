@@ -88,7 +88,7 @@ export function createTools() {
 
   const customTools: Tool[] = [
     {
-      name: 'get_weather',
+      name: 'Weather',
       description: 'Get current temperature for a given location.',
       parameters: {
         type: 'object',
@@ -185,6 +185,27 @@ Principles
 }
 
 /**
+ * Generate a deterministic tool execution ID based on tool name and arguments
+ * This ensures that start and completion events for the same tool call can be matched
+ */
+export function generateDeterministicToolExecutionId(
+  toolName: string, 
+  args: any, 
+  parentToolId?: string
+): string {
+  // Sort the keys to ensure consistent serialization regardless of argument order
+  const sortedArgs = Object.keys(args || {}).sort().reduce((obj, key) => {
+    obj[key] = args[key];
+    return obj;
+  }, {} as Record<string, any>);
+  
+  // Create a stable ID by combining tool name and serialized arguments
+  // Remove special characters to keep the ID cleaner
+  const argsHash = JSON.stringify(sortedArgs).replace(/[^a-zA-Z0-9]/g, '').substring(0, 12);
+  return `tool_${toolName}_${argsHash}${parentToolId ? '_p' + parentToolId : ''}`;
+}
+
+/**
  * Converts a Tool Execution Event to a ToolExecution for state
  */
 export function convertToolExecutionToState(
@@ -193,10 +214,12 @@ export function convertToolExecutionToState(
   result?: string,
   isSubtask?: boolean,
   parentToolId?: string,
-  error?: string
+  error?: string,
+  executionId?: string // Allow passing an explicit execution ID
 ): ToolExecution {
   const now = new Date();
-  const id = `tool_${Math.random().toString(36).substring(2, 9)}`;
+  // Use provided execution ID or generate a deterministic one
+  const id = executionId || generateDeterministicToolExecutionId(toolName, args, parentToolId);
   
   return {
     id,

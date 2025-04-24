@@ -9,7 +9,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Lint: `npm run lint` (runs ESLint)
 - Test: `npm test` (runs all tests)
 - Run single test: `npm test -- -t "test name"`
-- Run DOOM CLI: `npm run doom` (interactive CLI with tools)
+- Run classic DOOM CLI: `npm run doom` (interactive CLI with tools)
+- Run React/Ink DOOM CLI: `npm run doom:react` (modern CLI interface)
+- Run React/Ink DOOM CLI in dev mode: `npm run doom:dev` (with more verbose output)
 - Run subtasks example: `npm run subtasks`
 
 ## Code Style Guidelines

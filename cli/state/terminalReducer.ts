@@ -1,5 +1,6 @@
 import { HistoryItem, ToolExecution } from '../types';
 import { createTools, listToolsByCategory } from '../utils/tools';
+import { debugLogger } from '../components/DebugPanel';
 
 /**
  * Terminal state
@@ -27,6 +28,7 @@ export interface TerminalState {
   // Settings
   parallel: boolean;
   showTools: boolean;
+  debugMode: boolean;
 }
 
 /**
@@ -52,7 +54,8 @@ export type TerminalAction =
   | { type: 'PRUNE_TOOL_EXECUTIONS'; maxCount: number }
   | { type: 'SET_MODE'; mode: 'command' | 'input' | 'thinking' }
   | { type: 'TOGGLE_PARALLEL' }
-  | { type: 'TOGGLE_SHOW_TOOLS' };
+  | { type: 'TOGGLE_SHOW_TOOLS'; forceValue?: boolean }
+  | { type: 'TOGGLE_DEBUG_MODE'; forceValue?: boolean };
 
 /**
  * Initial state for the terminal
@@ -68,7 +71,9 @@ export const initialState: TerminalState = {
   toolExecutions: [],
   mode: 'command',
   parallel: false,
+  // Always start with tool visualization enabled
   showTools: true,
+  debugMode: false,
 };
 
 /**
@@ -230,6 +235,34 @@ export function reducer(state: TerminalState, action: TerminalAction): TerminalS
           };
         }
         
+        if (command === 'debug on') {
+          return {
+            ...state,
+            debugMode: true,
+            inputValue: '',
+            cursorPosition: 0,
+            history: [
+              ...state.history,
+              { type: 'command', content: trimmedInput },
+              { type: 'system', content: 'Debug mode enabled' },
+            ],
+          };
+        }
+        
+        if (command === 'debug off') {
+          return {
+            ...state,
+            debugMode: false,
+            inputValue: '',
+            cursorPosition: 0,
+            history: [
+              ...state.history,
+              { type: 'command', content: trimmedInput },
+              { type: 'system', content: 'Debug mode disabled' },
+            ],
+          };
+        }
+        
         if (command === 'help' || command === '?') {
           return {
             ...state,
@@ -249,6 +282,8 @@ export function reducer(state: TerminalState, action: TerminalAction): TerminalS
   /parallel off  - Disable parallel tool execution
   /tools on      - Enable tool call visualization
   /tools off     - Disable tool call visualization
+  /debug on      - Enable debug logging panel
+  /debug off     - Disable debug logging panel
 
 💡 Tips:
   - Ask questions naturally and DOOM will use weapons appropriately
@@ -404,20 +439,70 @@ export function reducer(state: TerminalState, action: TerminalAction): TerminalS
       };
       
     case 'ADD_TOOL_EXECUTION':
+      debugLogger.info(`ADD_TOOL_EXECUTION: ${action.execution.toolName}`);
+      debugLogger.debug(`Current executions: ${state.toolExecutions.length}, Adding ID: ${action.execution.id}`);
+      
+      // Create a new array to ensure React detects the change
+      const newExecutions = [...state.toolExecutions, action.execution];
+      debugLogger.debug(`New executions count: ${newExecutions.length}`);
+      
       return {
         ...state,
-        toolExecutions: [...state.toolExecutions, action.execution],
+        // Always ensure showTools is true when tool executions happen
+        showTools: true,
+        toolExecutions: newExecutions,
       };
       
     case 'UPDATE_TOOL_EXECUTION':
+      debugLogger.info(`UPDATE_TOOL_EXECUTION: ${action.execution.toolName} (${action.execution.status})`);
+      
+      // Check if we have the execution in the array already
+      const existingExecution = state.toolExecutions.find(exec => exec.id === action.execution.id);
+      
+      if (!existingExecution) {
+        // If we can't find it by ID, it might be a direct result without a start
+        // (this should be much less common with our deterministic IDs)
+        debugLogger.debug(`Can't find execution with ID ${action.execution.id}, adding as new execution`);
+        
+        // Since we're now using deterministic IDs, this should happen less frequently
+        const newExecutions = [...state.toolExecutions, action.execution];
+        debugLogger.debug(`New executions count: ${newExecutions.length}`);
+        
+        return {
+          ...state,
+          showTools: true,
+          toolExecutions: newExecutions,
+        };
+      }
+      
+      debugLogger.debug(`Found and updating execution ID: ${action.execution.id}, Status: ${action.execution.status}`);
+      
+      // Create a new array to ensure React detects the change
+      const updatedExecutions = state.toolExecutions.map(exec => 
+        exec.id === action.execution.id ? {
+          ...exec,
+          ...action.execution,
+          // Preserve the original start time if we're updating with a completion
+          startTime: exec.startTime,
+          // For all updates, calculate execution time correctly
+          executionTime: action.execution.executionTime || 
+                        (action.execution.endTime && 
+                         (new Date(action.execution.endTime).getTime() - 
+                          new Date(exec.startTime).getTime()))
+        } : exec
+      );
+      
+      debugLogger.debug(`Updated executions count: ${updatedExecutions.length}`);
+      
       return {
         ...state,
-        toolExecutions: state.toolExecutions.map(exec =>
-          exec.id === action.execution.id ? action.execution : exec
-        ),
+        // Always ensure showTools is true when tool executions happen
+        showTools: true,
+        toolExecutions: updatedExecutions,
       };
       
     case 'CLEAR_TOOL_EXECUTIONS':
+      debugLogger.info(`CLEAR_TOOL_EXECUTIONS: Clearing ${state.toolExecutions.length} executions`);
       return {
         ...state,
         toolExecutions: [],
@@ -446,9 +531,19 @@ export function reducer(state: TerminalState, action: TerminalAction): TerminalS
       };
       
     case 'TOGGLE_SHOW_TOOLS':
+      // If forceValue is provided, use it, otherwise toggle
+      const newShowTools = action.forceValue !== undefined ? action.forceValue : !state.showTools;
       return {
         ...state,
-        showTools: !state.showTools,
+        showTools: newShowTools,
+      };
+      
+    case 'TOGGLE_DEBUG_MODE':
+      // If forceValue is provided, use it, otherwise toggle
+      const newDebugMode = action.forceValue !== undefined ? action.forceValue : !state.debugMode;
+      return {
+        ...state,
+        debugMode: newDebugMode,
       };
       
     default:

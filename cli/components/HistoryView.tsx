@@ -91,12 +91,52 @@ function HistoryItemView({ item }: { item: HistoryItem }) {
       );
       
     case 'tool':
+      // Determine tool execution state from content
+      const isRunning = item.content.includes('Running ');
+      const hasError = item.content.includes(' - Error: ');
+      const hasResult = item.content.includes(' → ');
+      
+      // Format tool name and args for better display
+      let formattedContent = item.content;
+      
+      if (isRunning) {
+        // Format running tools: "Running toolName(args)..." becomes "toolName(args)"
+        formattedContent = formattedContent.replace('Running ', '');
+        formattedContent = formattedContent.replace('...', '');
+      } else if (hasResult) {
+        // Format tool results - Make arrow more prominent and add spacing
+        const parts = formattedContent.split(' → ');
+        if (parts.length === 2) {
+          const toolPart = parts[0].trim();
+          const resultPart = parts[1].trim();
+          formattedContent = toolPart;
+        }
+      }
+      
       return (
-        <Box>
+        <Box marginY={1}>
           <Box marginRight={1}>
-            <Text color="cyan">{figures.info}</Text>
+            {isRunning ? (
+              <Text color="blue">⚙️ </Text>
+            ) : hasError ? (
+              <Text color="red">✖ </Text>
+            ) : (
+              <Text color="green">✓ </Text>
+            )}
           </Box>
-          <Text>{item.content}</Text>
+          <Box flexDirection="column">
+            <Text>{formattedContent}</Text>
+            {hasResult && (
+              <Box paddingLeft={2} marginTop={0}>
+                <Text dimColor>↪ {item.content.split(' → ')[1].trim()}</Text>
+              </Box>
+            )}
+            {hasError && (
+              <Box paddingLeft={2} marginTop={0}>
+                <Text color="red">{item.content.split(' - Error: ')[1].trim()}</Text>
+              </Box>
+            )}
+          </Box>
         </Box>
       );
       

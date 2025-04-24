@@ -76,6 +76,17 @@ export async function runChatWithTools(
             // Record start time for execution metrics
             const startTime = Date.now();
             
+            // Emit a "start" event before executing the tool
+            if (options.onToolExecution) {
+              options.onToolExecution({
+                toolName: name,
+                args,
+                // No result yet - this is a start event
+                status: 'running',
+                isSubtask: false
+              });
+            }
+            
             const result = await tool.func(args);
             
             // Calculate execution time
@@ -84,13 +95,14 @@ export async function runChatWithTools(
             // Standardize output to be a ToolResult
             const toolResult: ToolResult = result;
 
-            // Call the tool execution callback if provided
+            // Call the tool execution callback again with the result (completion event)
             if (options.onToolExecution) {
               options.onToolExecution({
                 toolName: name,
                 args,
                 result: toolResult.output,
                 executionTime,
+                status: 'success',
                 isSubtask: false
               });
             }
@@ -140,12 +152,17 @@ export async function runChatWithTools(
             const errorMessage = error instanceof Error ? error.message : String(error);
             logger.error(`Error executing tool ${name}: ${errorMessage}`);
             
+            // Calculate execution time even for errors
+            const executionTime = Date.now() - startTime;
+            
             // Call the tool execution callback if provided
             if (options.onToolExecution) {
               options.onToolExecution({
                 toolName: name,
                 args,
                 error: errorMessage,
+                executionTime,
+                status: 'error',
                 isSubtask: false
               });
             }
@@ -208,6 +225,17 @@ async function executeOneSubTask(
     // Record start time for execution metrics
     const startTime = Date.now();
     
+    // Emit a "start" event before executing the subtask
+    if (options.onToolExecution) {
+      options.onToolExecution({
+        toolName: task.toolName,
+        args: task.args,
+        status: 'running',
+        isSubtask: true,
+        parentToolName: options.parentCallId
+      });
+    }
+    
     // Invoke the tool
     const toolResult = await tool.func(task.args);
     
@@ -218,13 +246,14 @@ async function executeOneSubTask(
     const callId = `task_${Math.random().toString(36).substring(2, 9)}`;
     logger.debug(`Adding subtask result to conversation: ${callId}`);
     
-    // Call the tool execution callback if provided
+    // Call the tool execution callback with the result
     if (options.onToolExecution) {
       options.onToolExecution({
         toolName: task.toolName,
         args: task.args,
         result: toolResult.output,
         executionTime,
+        status: 'success',
         isSubtask: true,
         parentToolName: options.parentCallId
       });
@@ -280,12 +309,17 @@ async function executeOneSubTask(
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error(`Error executing subtask ${task.toolName}: ${errorMessage}`);
     
+    // Calculate execution time even for errors
+    const executionTime = Date.now() - startTime;
+    
     // Call the tool execution callback if provided
     if (options.onToolExecution) {
       options.onToolExecution({
         toolName: task.toolName,
         args: task.args,
         error: errorMessage,
+        executionTime,
+        status: 'error',
         isSubtask: true,
         parentToolName: options.parentCallId
       });

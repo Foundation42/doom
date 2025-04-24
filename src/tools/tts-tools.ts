@@ -87,7 +87,7 @@ export function createTTSTools(): Tool[] {
  * A tool for converting text to speech using OpenAI's TTS API
  */
 export const speakTextTool: Tool = {
-  name: 'speakText',
+  name: 'SpeakText',
   description: 'Converts text to speech and plays it using OpenAI\'s text-to-speech API',
   parameters: {
     type: 'object',

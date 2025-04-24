@@ -374,7 +374,7 @@ function createTools() {
 
   const customTools: Tool[] = [
     {
-      name: 'get_weather',
+      name: 'Weather',
       description: 'Get current temperature for a given location.',
       parameters: {
         type: 'object',

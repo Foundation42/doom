@@ -44,6 +44,9 @@ doom --showtool "What's the weather in Tokyo?"
 # Force verbose output in batch mode
 doom --verbose "What's the weather in Tokyo?"
 
+# Start the modern React-based CLI (Claude Code-inspired UI)
+npm run doom:react
+
 # REPL commands
 # /help          - Show help message
 # /tools         - List available tools
@@ -51,6 +54,23 @@ doom --verbose "What's the weather in Tokyo?"
 # /exit          - Exit DOOM
 # /tools on/off  - Enable/disable tool visualization
 # /parallel on/off - Enable/disable parallel execution
+```
+
+## Modern React-Based CLI
+
+DOOM now features a modern, component-based CLI built with React and Ink, inspired by Claude Code's interface:
+
+- Component-based architecture with proper state management
+- Multi-line input with cursor control
+- Command history navigation with up/down arrows
+- Tool execution visualization
+- Status bar with mode indicators
+- Tab completion for commands (coming soon)
+
+To run the modern CLI interface:
+
+```bash
+npm run doom:react
 ```
 
 ## Features

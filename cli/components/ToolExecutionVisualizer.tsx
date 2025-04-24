@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Box, Text } from 'ink';
 import figures from 'figures';
 import { ToolExecution } from '../types';
+import { debugLogger } from './DebugPanel';
 
 interface ToolExecutionVisualizerProps {
   executions: ToolExecution[];
@@ -11,15 +12,30 @@ interface ToolExecutionVisualizerProps {
  * Visualizes the current tool executions and their status
  */
 function ToolExecutionVisualizer({ executions }: ToolExecutionVisualizerProps) {
-  // Only show running executions or the most recent completed ones (max 3)
+  // Log when the executions change
+  useEffect(() => {
+    debugLogger.debug(`ToolExecutionVisualizer received ${executions.length} executions`);
+    if (executions.length > 0) {
+      executions.forEach(exec => {
+        debugLogger.debug(`  Tool: ${exec.toolName}, Status: ${exec.status}`);
+      });
+    }
+  }, [executions]);
+  
+  // Show all tool executions (max 3)
   const visibleExecutions = executions
-    .filter(exec => exec.status === 'running' || !!exec.endTime)
+    // Filter condition was too strict - accept all statuses now
+    // .filter(exec => exec.status === 'running' || !!exec.endTime)
     .slice(-3);
 
+  // Log what executions will be visible
   if (visibleExecutions.length === 0) {
+    // debugLogger.debug('ToolExecutionVisualizer: No executions to display');
     return null;
   }
-
+  
+  debugLogger.debug(`ToolExecutionVisualizer: Rendering ${visibleExecutions.length} executions`);
+  
   return (
     <Box flexDirection="column" borderStyle="single" borderColor="gray">
       {visibleExecutions.map(execution => (

@@ -3,7 +3,8 @@ import { runChatWithTools } from '../../src/chatrunner';
 import { Message, Tool, ToolExecutionEvent } from '../../src/types';
 import { Dispatch } from 'react';
 import { HistoryItem, TerminalAction } from '../state/terminalReducer';
-import { convertToolExecutionToState } from '../utils/tools';
+import { convertToolExecutionToState, generateDeterministicToolExecutionId } from '../utils/tools';
+import { debugLogger } from '../components/DebugPanel';
 
 /**
  * Create a logger for the REPL
@@ -64,30 +65,88 @@ export async function processUserInput(
     const handleToolExecution = (event: ToolExecutionEvent) => {
       const { toolName, args, result, executionTime, error, isSubtask, parentToolName } = event;
       
-      // Create a tool execution entry for state
+      // Log the tool execution event
+      debugLogger.info(`Tool execution: ${toolName}(${Object.keys(args).join(',')})`);
+      
+      // Generate a deterministic ID for this tool execution
+      const executionId = generateDeterministicToolExecutionId(toolName, args, parentToolName);
+      
+      // Create a tool execution entry for state with the deterministic ID
       const toolExecution = convertToolExecutionToState(
         toolName,
         args,
         result,
         isSubtask,
         parentToolName,
-        error
+        error,
+        executionId // Pass the deterministic ID
       );
       
+      // Add a debug log to track tool executions
+      console.log('🛠️ Tool execution event:', { toolName, isSubtask, status: error ? 'error' : result ? 'success' : 'running' });
+      debugLogger.debug(`Tool status: ${error ? 'error' : result ? 'success' : 'running'}, ID: ${executionId}`);
+      
+      // Always collect and store tool executions, regardless of display setting
       if (error) {
+        debugLogger.error(`Tool error: ${error}`);
+        
+        // Use UPDATE_TOOL_EXECUTION action regardless - our deterministic ID will match correctly
         dispatch({ type: 'UPDATE_TOOL_EXECUTION', execution: toolExecution });
+        
+        // Add tool error to history
+        if (showTools) {
+          dispatch({ 
+            type: 'ADD_HISTORY_ITEM', 
+            item: { 
+              type: 'tool', 
+              content: `${toolName}(${Object.entries(args).map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(', ')}) - Error: ${error}`,
+              timestamp: new Date()
+            } 
+          });
+        }
       } else if (result) {
+        debugLogger.info(`Tool result: ${result?.substring(0, 40)}${result?.length > 40 ? '...' : ''}`);
+        
+        // Use UPDATE_TOOL_EXECUTION action regardless - our deterministic ID will match correctly
         dispatch({ type: 'UPDATE_TOOL_EXECUTION', execution: {
           ...toolExecution,
           executionTime
         }});
+        
+        // Add completed tool with result to history
+        if (showTools) {
+          dispatch({ 
+            type: 'ADD_HISTORY_ITEM', 
+            item: { 
+              type: 'tool', 
+              content: `${toolName}(${Object.entries(args).map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(', ')}) → ${result?.substring(0, 60)}${result?.length > 60 ? '...' : ''} (${executionTime}ms)`,
+              timestamp: new Date()
+            } 
+          });
+        }
       } else {
+        // This is a tool start event
+        debugLogger.debug(`Tool started: ${toolName} with ID ${executionId}`);
+        
         dispatch({ type: 'ADD_TOOL_EXECUTION', execution: toolExecution });
+        
+        // Add tool start to history
+        if (showTools) {
+          dispatch({ 
+            type: 'ADD_HISTORY_ITEM', 
+            item: { 
+              type: 'tool', 
+              content: `Running ${toolName}(${Object.entries(args).map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(', ')})...`,
+              timestamp: new Date()
+            } 
+          });
+        }
       }
     };
     
-    // Add debug log
-    console.log('📝 Processing input with LLM:', input);
+    // Add debug log for user input
+    debugLogger.info(`Processing user input: ${input}`);
+    debugLogger.debug(`Config - showTools: ${showTools}, parallel: ${parallel}`);
     
     // Run chat with tools
     const response = await runChatWithTools(currentMessages, tools, {
@@ -97,8 +156,9 @@ export async function processUserInput(
       timeoutMs: 55000,
       maxRetries: 2,
       parallel,
-      onToolExecution: showTools ? handleToolExecution : undefined,
-      showToolCalls: showTools // This needs to be true to emit tool execution events
+      // Always attach the handler to collect tool executions, regardless of display setting
+      onToolExecution: handleToolExecution,
+      showToolCalls: true // Always set to true to emit tool execution events
     });
     
     // Add debug log
@@ -113,8 +173,8 @@ export async function processUserInput(
     
     dispatch({ type: 'ADD_HISTORY_ITEM', item: responseItem });
     
-    // Clear tool executions
-    dispatch({ type: 'CLEAR_TOOL_EXECUTIONS' });
+    // Don't clear tool executions - keep them visible
+    // dispatch({ type: 'CLEAR_TOOL_EXECUTIONS' });
     
     // Set mode back to command
     dispatch({ type: 'SET_MODE', mode: 'command' });
